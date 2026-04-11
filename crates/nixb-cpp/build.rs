@@ -28,7 +28,7 @@ fn main() {
         .file("cpp/wrapper.cpp")
         .file("cpp/function.cpp")
         .flag("-std=c++23")
-        .compile("nix_bindings_cpp");
+        .compile("nixb_cpp");
 
     println!("cargo:rerun-if-changed=cpp/wrapper.cpp");
     println!("cargo:rerun-if-changed=cpp/function.cpp");

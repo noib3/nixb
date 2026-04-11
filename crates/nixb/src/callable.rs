@@ -136,7 +136,7 @@ pub trait Callable {
             .and_then(|()| {
                 ctx.with_raw_and_state(|ctx, state| unsafe {
                     #[cfg(not(feature = "nix-2-34"))]
-                    nix_bindings_cpp::value_call_multi(
+                    nixb_cpp::value_call_multi(
                         ctx,
                         state.as_ptr(),
                         self.value_ptr(),

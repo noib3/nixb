@@ -344,7 +344,7 @@ impl<Owner: ValueOwner> Value for NixValue<Owner> {
     fn force_inline(&mut self, ctx: &mut Context) -> Result<()> {
         ctx.with_raw_and_state(|ctx, state| unsafe {
             #[cfg(not(feature = "nix-2-34"))]
-            nix_bindings_cpp::force_value(ctx, state.as_ptr(), self.as_ptr());
+            nixb_cpp::force_value(ctx, state.as_ptr(), self.as_ptr());
 
             #[cfg(feature = "nix-2-34")]
             nixb_sys::value_force(ctx, state.as_ptr(), self.as_ptr());
@@ -744,7 +744,7 @@ impl Value for &std::path::Path {
         #[cfg(not(feature = "nix-2-34"))]
         {
             unsafe {
-                nix_bindings_cpp::init_path_string(
+                nixb_cpp::init_path_string(
                     ctx.state_ptr(),
                     dest.as_ptr(),
                     cstring.as_ptr(),

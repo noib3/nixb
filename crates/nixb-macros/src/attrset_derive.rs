@@ -87,7 +87,7 @@ pub(crate) fn expand(input: DeriveInput) -> syn::Result<TokenStream> {
     // skippable.
     let into_static_attrset_body = if num_non_skippable_fields == fields.len() {
         quote! {
-            ::nix_bindings::attrset::StaticAttrset::<true, _, _>::new(
+            ::nixb::attrset::StaticAttrset::<true, _, _>::new(
                 (#(#keys),*),
                 (#(#values),*),
             )
@@ -113,7 +113,7 @@ pub(crate) fn expand(input: DeriveInput) -> syn::Result<TokenStream> {
 
         quote! {
             #(#skip_var_declarations)*
-            ::nix_bindings::attrset::StaticAttrsetWithSkips::<true, _, _>::new(
+            ::nixb::attrset::StaticAttrsetWithSkips::<true, _, _>::new(
                 (#(#keys),*),
                 (#(#values),*),
                 #num_non_skippable #(#plus_one_if_field_is_not_skipped)*,
@@ -144,19 +144,19 @@ pub(crate) fn expand(input: DeriveInput) -> syn::Result<TokenStream> {
     let struct_name = &input.ident;
 
     Ok(quote! {
-        impl #impl_generics ::nix_bindings::attrset::Attrset for #struct_name #ty_generics #extended_where_clause {
+        impl #impl_generics ::nixb::attrset::Attrset for #struct_name #ty_generics #extended_where_clause {
             #[inline]
             fn into_attrset_iter<#eval_lifetime>(
                 self,
-                #ctx: &mut ::nix_bindings::prelude::Context<#eval_lifetime>,
-            ) -> impl ::nix_bindings::attrset::AttrsetIterator + use<#(#use_params),*> {
+                #ctx: &mut ::nixb::prelude::Context<#eval_lifetime>,
+            ) -> impl ::nixb::attrset::AttrsetIterator + use<#(#use_params),*> {
                 #into_static_attrset_body.into_attrset_iter(#ctx)
             }
         }
 
-        impl #impl_generics ::nix_bindings::attrset::MergeableAttrset for #struct_name #ty_generics #extended_where_clause {
+        impl #impl_generics ::nixb::attrset::MergeableAttrset for #struct_name #ty_generics #extended_where_clause {
             #[inline]
-            fn contains_key(&self, __key: &::core::ffi::CStr, _: &mut ::nix_bindings::prelude::Context) -> bool {
+            fn contains_key(&self, __key: &::core::ffi::CStr, _: &mut ::nixb::prelude::Context) -> bool {
                 match __key.to_bytes() {
                     #(#contains_key_match_arms)*
                     _ => false,
@@ -166,26 +166,26 @@ pub(crate) fn expand(input: DeriveInput) -> syn::Result<TokenStream> {
             #[inline]
             fn for_each_key<#eval_lifetime>(
                 &self,
-                mut __fun: impl FnMut(&::core::ffi::CStr, &mut ::nix_bindings::prelude::Context<#eval_lifetime>),
-                #ctx: &mut ::nix_bindings::prelude::Context<#eval_lifetime>,
+                mut __fun: impl FnMut(&::core::ffi::CStr, &mut ::nixb::prelude::Context<#eval_lifetime>),
+                #ctx: &mut ::nixb::prelude::Context<#eval_lifetime>,
             ) {
                 #(#for_each_key_stmts)*
             }
         }
 
-        impl #impl_generics ::nix_bindings::value::Value for #struct_name #ty_generics #extended_where_clause {
+        impl #impl_generics ::nixb::value::Value for #struct_name #ty_generics #extended_where_clause {
             #[inline]
-            fn kind(&self) -> ::nix_bindings::value::ValueKind {
-                ::nix_bindings::value::ValueKind::Attrset
+            fn kind(&self) -> ::nixb::value::ValueKind {
+                ::nixb::value::ValueKind::Attrset
             }
 
             #[inline]
             fn write(
                 self,
-                dest: ::nix_bindings::value::UninitValue,
-                ctx: &mut ::nix_bindings::context::Context,
-            ) -> ::nix_bindings::error::Result<()> {
-                ::nix_bindings::attrset::Attrset::write(self, dest, ctx)
+                dest: ::nixb::value::UninitValue,
+                ctx: &mut ::nixb::context::Context,
+            ) -> ::nixb::error::Result<()> {
+                ::nixb::attrset::Attrset::write(self, dest, ctx)
             }
         }
     })
@@ -370,13 +370,13 @@ impl Field {
                 #[inline(always)]
                 fn __call<T, R>(f: impl FnOnce(T) -> R, v: T) -> R { f(v) }
                 let __field = self.#field_ident;
-                ::nix_bindings::value::IntoValueFn::new(move |__ctx| __call(#expr, __field))
+                ::nixb::value::IntoValueFn::new(move |__ctx| __call(#expr, __field))
             }},
             None => quote! { self.#field_ident },
         };
 
         let value_expr = if should_skip_expr.is_some() {
-            quote! { ::nix_bindings::attrset::skips::MightSkip::new(#value_expr, #skip_var_name) }
+            quote! { ::nixb::attrset::skips::MightSkip::new(#value_expr, #skip_var_name) }
         } else {
             value_expr
         };

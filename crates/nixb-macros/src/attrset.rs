@@ -44,7 +44,7 @@ pub(crate) fn expand(input: TokenStream) -> syn::Result<TokenStream> {
             let value_var = format_ident!("__value_{idx}");
             let skip_var = format_ident!("__should_skip_{idx}");
             quote! {
-                ::nix_bindings::attrset::skips::MightSkip::new(#value_var, #skip_var)
+                ::nixb::attrset::skips::MightSkip::new(#value_var, #skip_var)
             }
             .to_tokens(&mut values);
         } else {
@@ -89,7 +89,7 @@ pub(crate) fn expand(input: TokenStream) -> syn::Result<TokenStream> {
 
         Ok(quote! {{
             #(#optional_var_declarations)*
-            ::nix_bindings::attrset::StaticAttrsetWithSkips::<#all_keys_are_literals, _, _>::new(
+            ::nixb::attrset::StaticAttrsetWithSkips::<#all_keys_are_literals, _, _>::new(
                 (#keys),
                 (#values),
                 #num_non_optional #(#plus_one_if_not_skipped)*,
@@ -97,7 +97,7 @@ pub(crate) fn expand(input: TokenStream) -> syn::Result<TokenStream> {
         }})
     } else {
         Ok(quote! {
-            ::nix_bindings::attrset::StaticAttrset::<#all_keys_are_literals, _, _>::new(
+            ::nixb::attrset::StaticAttrset::<#all_keys_are_literals, _, _>::new(
                 (#keys),
                 (#values)
             )
@@ -209,7 +209,7 @@ impl ToTokens for Key {
                 let literal = Literal::c_string(c_string);
                 tokens.extend(quote! {
                     // SAFETY: valid UTF-8.
-                    unsafe { ::nix_bindings::Utf8CStr::new_unchecked(#literal) }
+                    unsafe { ::nixb::Utf8CStr::new_unchecked(#literal) }
                 })
             },
             Self::Expr(expr) => tokens.extend(quote! { { #expr } }),

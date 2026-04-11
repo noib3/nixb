@@ -12,11 +12,11 @@ pub(crate) fn expand(input: DeriveInput) -> syn::Result<TokenStream> {
     let struct_name = &input.ident;
 
     Ok(quote! {
-        impl ::nix_bindings::primop::PrimOp for #struct_name {
+        impl ::nixb::primop::PrimOp for #struct_name {
             const DOCS: &'static ::core::ffi::CStr = #docs;
 
-            const NAME: &'static ::nix_bindings::Utf8CStr = unsafe {
-                ::nix_bindings::Utf8CStr::new_unchecked(#camel_case_name)
+            const NAME: &'static ::nixb::Utf8CStr = unsafe {
+                ::nixb::Utf8CStr::new_unchecked(#camel_case_name)
             };
         }
     })
