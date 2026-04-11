@@ -47,9 +47,9 @@ enum NixVersion {
 impl NixVersion {
     fn as_cpp_define(self) -> &'static str {
         match self {
-            Self::Nix232 => "NIX_BINDINGS_TARGET_NIX_2_32",
-            Self::Nix233 => "NIX_BINDINGS_TARGET_NIX_2_33",
-            Self::Nix234 => "NIX_BINDINGS_TARGET_NIX_2_34",
+            Self::Nix232 => "NIX_2_32",
+            Self::Nix233 => "NIX_2_33",
+            Self::Nix234 => "NIX_2_34",
         }
     }
 
