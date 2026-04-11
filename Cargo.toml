@@ -19,7 +19,7 @@ memchr = "2"
 pkg-config = "0.3"
 proc-macro2 = "1"
 quote = "1"
-rusqlite = { version = "0.39", features = ["bundled"] }
+rusqlite = { version = "0.38", features = ["bundled"] }
 smallvec = "1"
 syn = "2"
 
