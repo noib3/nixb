@@ -1,0 +1,67 @@
+#![expect(missing_docs)]
+
+use std::env;
+
+const NIX_2_32_FEATURE: &str = "CARGO_FEATURE_NIX_2_32";
+const NIX_2_33_FEATURE: &str = "CARGO_FEATURE_NIX_2_33";
+const NIX_2_34_FEATURE: &str = "CARGO_FEATURE_NIX_2_34";
+
+fn main() {
+    let target_nix = NixVersion::selected();
+
+    let nix_expr = pkg_config::Config::new()
+        .cargo_metadata(false)
+        .probe("nix-expr")
+        .expect("Could not find nix-expr via pkg-config");
+
+    let mut build = cc::Build::new();
+
+    for lib in [&nix_expr] {
+        for include_path in &lib.include_paths {
+            build.include(include_path);
+        }
+    }
+
+    build
+        .cpp(true)
+        .define(target_nix.as_cpp_define(), None)
+        .file("cpp/wrapper.cpp")
+        .file("cpp/function.cpp")
+        .flag("-std=c++23")
+        .compile("nix_bindings_cpp");
+
+    println!("cargo:rerun-if-changed=cpp/wrapper.cpp");
+    println!("cargo:rerun-if-changed=cpp/function.cpp");
+    println!("cargo:rerun-if-env-changed={NIX_2_32_FEATURE}");
+    println!("cargo:rerun-if-env-changed={NIX_2_33_FEATURE}");
+    println!("cargo:rerun-if-env-changed={NIX_2_34_FEATURE}");
+}
+
+#[derive(Copy, Clone)]
+enum NixVersion {
+    Nix232,
+    Nix233,
+    Nix234,
+}
+
+impl NixVersion {
+    fn as_cpp_define(self) -> &'static str {
+        match self {
+            Self::Nix232 => "NIX_BINDINGS_TARGET_NIX_2_32",
+            Self::Nix233 => "NIX_BINDINGS_TARGET_NIX_2_33",
+            Self::Nix234 => "NIX_BINDINGS_TARGET_NIX_2_34",
+        }
+    }
+
+    fn selected() -> Self {
+        if env::var_os(NIX_2_34_FEATURE).is_some() {
+            Self::Nix234
+        } else if env::var_os(NIX_2_33_FEATURE).is_some() {
+            Self::Nix233
+        } else if env::var_os(NIX_2_32_FEATURE).is_some() {
+            Self::Nix232
+        } else {
+            unreachable!()
+        }
+    }
+}

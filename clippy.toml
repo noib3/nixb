@@ -1,0 +1,4 @@
+allow-unwrap-in-tests = true
+allowed-wildcard-imports = ["super"]
+too-many-arguments-threshold = 4
+too-many-lines-threshold = 60

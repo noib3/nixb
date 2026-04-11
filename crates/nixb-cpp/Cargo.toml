@@ -1,0 +1,21 @@
+[package]
+name = "nixb-cpp"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[features]
+nix-2-32 = ["nixb-sys/nix-2-32"]
+nix-2-33 = ["nix-2-32", "nixb-sys/nix-2-33"]
+nix-2-34 = ["nix-2-33", "nixb-sys/nix-2-34"]
+
+[dependencies]
+nixb-sys = { workspace = true }
+
+[build-dependencies]
+cc = { workspace = true }
+pkg-config = { workspace = true }
+
+[lints]
+workspace = true

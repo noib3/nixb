@@ -1,0 +1,60 @@
+[workspace]
+members = ["crates/*"]
+resolver = "3"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+authors = ["Riccardo Mazzarini <me@noib3.dev>"]
+license = "MIT"
+
+[workspace.dependencies]
+# Third-party dependencies.
+cc = "1"
+compact_str = "0.9"
+either = { version = "1", default-features = false }
+libc = { version = "0.2", default-features = false }
+libloading = "0.9"
+memchr = "2"
+pkg-config = "0.3"
+proc-macro2 = "1"
+quote = "1"
+rusqlite = { version = "0.39", features = ["bundled"] }
+smallvec = "1"
+syn = "2"
+
+# Internal dependencies.
+nixb = { path = "./crates/nixb", default-features = false }
+nixb-cpp = { path = "./crates/nixb-cpp" }
+nixb-macros = { path = "./crates/nixb-macros" }
+nixb-sys = { path = "./crates/nixb-sys" }
+
+[workspace.lints.clippy]
+alloc_instead_of_core = "warn"
+bool_to_int_with_if = "deny"
+cognitive_complexity = "deny"
+let_underscore_future = "allow"
+module_inception = "allow"
+multiple_crate_versions = "deny"
+needless_collect = "deny"
+same_name_method = "deny"
+std_instead_of_core = "warn"
+too_many_arguments = "deny"
+too_many_lines = "deny"
+trivially_copy_pass_by_ref = "warn"
+undocumented_unsafe_blocks = "deny"
+unwrap_used = "deny"
+use_self = "warn"
+wildcard_dependencies = "deny"
+wildcard_imports = "warn"
+
+[workspace.lints.rust]
+future_incompatible = { level = "deny", priority = -1 }
+missing_docs = "deny"
+nonstandard_style = { level = "deny", priority = -1 }
+refining_impl_trait = { level = "allow", priority = -1 }
+unexpected_cfgs = { level = "warn", check-cfg = ["cfg(nightly)"] }
+
+[workspace.lints.rustdoc]
+broken_intra_doc_links = "deny"
+private_intra_doc_links = "deny"
