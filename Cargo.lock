@@ -177,6 +177,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "nixb-examples"
+version = "0.1.0"
+dependencies = [
+ "nixb",
+]
+
+[[package]]
 name = "nixb-macros"
 version = "0.1.0"
 dependencies = [

@@ -1,0 +1,24 @@
+[package]
+name = "nixb-examples"
+publish = false
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[features]
+default = ["nix-2-34"]
+nix-2-32 = ["nixb/nix-2-32"]
+nix-2-33 = ["nixb/nix-2-32"]
+nix-2-34 = ["nixb/nix-2-33"]
+
+[dependencies]
+nixb = { workspace = true }
+
+[[example]]
+name = "hello_world"
+path = "hello_world.rs"
+crate-type = ["cdylib"]
+
+[lints.rust]
+refining-impl-trait.level = "allow"
