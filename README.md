@@ -1,3 +1,18 @@
+## Quick start
+
+1) create a new Rust crate which compiles into a shared library
+
+```sh
+cargo new --lib myplugin
+cargo add nixb
+cargo <add dylib to targets>
+```
+
+2) write a plugin:
+
+```rust
+// src/lib.rs
+
 use nixb::prelude::*;
 
 /// A cool Nix plugin.
@@ -35,3 +50,39 @@ impl IntoValue for MyPlugin {
 fn myplugin(ctx: &mut Context<Entrypoint>) {
     ctx.register_primop(MyPlugin);
 }
+```
+
+3) Build the plugin and launch a REPL with the plugin's API:
+
+```sh
+cargo b && nix repl --option plugin-files ./target/debug/libmyplugin.{so|dylib}
+```
+
+```nix
+nix-repl> p = builtins.myPlugin
+
+nix-repl> p.listSameType
+[
+  "foo"
+  "baz"
+  "baz"
+]
+
+nix-repl> p.listDifferentTypes
+[
+  "string"
+  42
+]
+
+nix-repl> p.myAttrset
+{
+  field1 = "";
+  field2 = 0;
+}
+
+nix-repl> p.mkHello "John"
+"Hello John!"
+
+nix-repl> p.lazyEval
+42
+```
