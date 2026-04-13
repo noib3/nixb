@@ -16,14 +16,17 @@ compile_error!(
 );
 
 #[cfg(all(feature = "nix-2-32", not(feature = "nix-2-33")))]
+#[rustfmt::skip]
 #[path = "2_32.rs"]
 mod selected;
 
 #[cfg(all(feature = "nix-2-33", not(feature = "nix-2-34")))]
+#[rustfmt::skip]
 #[path = "2_33.rs"]
 mod selected;
 
 #[cfg(feature = "nix-2-34")]
+#[rustfmt::skip]
 #[path = "2_34.rs"]
 mod selected;
 

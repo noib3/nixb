@@ -29,6 +29,12 @@ fn main() -> Result<(), String> {
     let mut builder = bindgen::Builder::default()
         .use_core()
         .formatter(bindgen::Formatter::Rustfmt)
+        .disable_header_comment()
+        .raw_line(format!(
+            "//! This file is generated from Nix {nix_version} headers. Do \
+             not edit it manually."
+        ))
+        .raw_line("")
         .parse_callbacks(Box::new(bindgen::CargoCallbacks::new()))
         .parse_callbacks(Box::new(ProcessComments))
         .parse_callbacks(Box::new(StripNixPrefix));
@@ -63,11 +69,6 @@ fn main() -> Result<(), String> {
         .generate()
         .map_err(|err| format!("Couldn't generate bindings: {err}"))?;
 
-    let file_contents = format!(
-        "// This file is generated from Nix {nix_version} headers. Do not \
-         edit it manually.\n\n{bindings}",
-    );
-
     let output_file = Path::new(&output_file);
 
     if let Some(parent) = output_file.parent() {
@@ -79,7 +80,7 @@ fn main() -> Result<(), String> {
         })?;
     }
 
-    fs::write(output_file, file_contents).map_err(|err| {
+    fs::write(output_file, bindings.to_string()).map_err(|err| {
         format!(
             "Couldn't write generated bindings to {}: {err}",
             output_file.display()
