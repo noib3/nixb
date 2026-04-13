@@ -28,7 +28,7 @@ pub mod value;
 #[doc(hidden)]
 pub use entry::entry;
 pub use into_result::IntoResult;
-pub use nixb_macros::{Attrset, PrimOp, TryFromValue, Value, entry};
+pub use nixb_macros::{Attrset, PrimOp, TryFromValue, Value, plugin};
 #[doc(hidden)]
 pub use nixb_sys as sys;
 pub use utf8_cstr::Utf8CStr;

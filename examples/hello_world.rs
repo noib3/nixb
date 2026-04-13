@@ -11,7 +11,7 @@ impl IntoValue for HelloWorld {
     }
 }
 
-#[nixb::entry]
+#[nixb::plugin]
 fn hello_world(ctx: &mut Context<Entrypoint>) {
     ctx.register_primop(HelloWorld);
 }
