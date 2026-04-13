@@ -9,8 +9,8 @@ license.workspace = true
 [features]
 default = ["nix-2-34"]
 nix-2-32 = ["nixb/nix-2-32"]
-nix-2-33 = ["nixb/nix-2-32"]
-nix-2-34 = ["nixb/nix-2-33"]
+nix-2-33 = ["nixb/nix-2-33"]
+nix-2-34 = ["nixb/nix-2-34"]
 
 [dependencies]
 nixb = { workspace = true }
@@ -18,6 +18,11 @@ nixb = { workspace = true }
 [[example]]
 name = "hello_world"
 path = "hello_world.rs"
+crate-type = ["cdylib"]
+
+[[example]]
+name = "readme"
+path = "readme.rs"
 crate-type = ["cdylib"]
 
 [lints.rust]
