@@ -279,9 +279,10 @@ mod platform {
 
     /// Calls the given function with the path of each loaded shared library in
     /// the current process.
-    pub(super) fn loaded_image_paths<T>(
-        fun: impl FnMut(&CStr) -> ControlFlow<T>,
-    ) -> Option<T> {
+    pub(super) fn loaded_image_paths<F, T>(fun: F) -> Option<T>
+    where
+        F: FnMut(&CStr) -> ControlFlow<T>,
+    {
         struct State<F, T> {
             fun: F,
             break_value: Option<T>,
@@ -314,8 +315,8 @@ mod platform {
 
         unsafe {
             dl_iterate_phdr(
-                Some(callback::<_, T>),
-                (&mut state as *mut State<_, _>).cast(),
+                Some(callback::<F, T>),
+                (&mut state as *mut State<F, T>).cast(),
             );
         }
 
