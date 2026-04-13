@@ -66,9 +66,6 @@ let
 
   examplesManifest = builtins.fromTOML (builtins.readFile ../examples/Cargo.toml);
   exampleNames = map (example: example.name) examplesManifest.example;
-  versionedNixPackages = lib.filterAttrs (
-    nixSourceKey: _: builtins.match "[0-9]+_[0-9]+" nixSourceKey != null
-  ) nixPackages;
 
   mkExamplesBundle =
     nixSourceKey: nixPackage:
@@ -91,4 +88,4 @@ in
 lib.mapAttrs' (nixSourceKey: nixPackage: {
   name = "nix-${builtins.replaceStrings [ "_" ] [ "-" ] nixSourceKey}";
   value = mkExamplesBundle nixSourceKey nixPackage;
-}) versionedNixPackages
+}) nixPackages

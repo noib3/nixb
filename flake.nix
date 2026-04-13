@@ -57,32 +57,48 @@
             "${./rustfmt.toml}"
           ];
         };
+
+      mkNixPackages =
+        pkgs:
+        pkgs.callPackage ./nix/nix-packages.nix {
+          inherit nixpkgs;
+        };
     in
     {
       packages = forEachSystem (
         system: pkgs:
         let
-          nixPackages = pkgs.callPackage ./nix/nix-packages.nix {
-            inherit nixpkgs;
-          };
-        in
-        {
-          sys-bindings = pkgs.callPackage ./nix/sys-bindings.nix {
-            rust = mkRustToolchain pkgs;
-          };
+          nixPackages = mkNixPackages pkgs;
           examples = pkgs.callPackage ./nix/examples.nix {
             inherit nixPackages;
             rust = mkRustToolchain pkgs;
           };
+        in
+        {
+          inherit examples;
           check-examples = pkgs.callPackage ./nix/check-examples.nix {
             inherit nixPackages;
-            examplesPackages = self.packages.${system}.examples;
+            examplesPackages = examples;
+          };
+          sys-bindings = pkgs.callPackage ./nix/sys-bindings.nix {
+            rust = mkRustToolchain pkgs;
           };
         }
       );
 
       apps = forEachSystem (
         system: pkgs: {
+          check-formatting = {
+            type = "app";
+            program = nixpkgs.lib.getExe (
+              pkgs.writeShellApplication {
+                name = "check-formatting";
+                text = ''
+                  ${nixpkgs.lib.getExe self.formatter.${system}} --fail-on-change
+                '';
+              }
+            );
+          };
           update-bindings-generator-lockfile = {
             type = "app";
             program = nixpkgs.lib.getExe (
@@ -91,10 +107,6 @@
               }
             );
           };
-          check-examples = nixpkgs.lib.mapAttrs (_name: check: {
-            type = "app";
-            program = nixpkgs.lib.getExe check;
-          }) self.packages.${system}.check-examples;
           update-sys-bindings = {
             type = "app";
             program = nixpkgs.lib.getExe (

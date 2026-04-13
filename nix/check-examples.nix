@@ -12,7 +12,9 @@ let
   nixFeature =
     nixPackage:
     "nix-${
-      builtins.replaceStrings [ "." ] [ "-" ] (lib.versions.majorMinor (lib.getVersion nixPackage))
+      builtins.replaceStrings [ "." ] [ "-" ] (
+        lib.versions.majorMinor (lib.getVersion nixPackage)
+      )
     }";
   versionedNixPackages = lib.filterAttrs (
     nixSourceKey: _: builtins.match "[0-9]+_[0-9]+" nixSourceKey != null
@@ -43,7 +45,9 @@ let
     in
     (writeShellApplication {
       name = "check-examples-${lib.getVersion nixPackage}";
-      text = lib.concatStringsSep "\n" (map lib.getExe (builtins.attrValues exampleChecks));
+      text = lib.concatStringsSep "\n" (
+        map lib.getExe (builtins.attrValues exampleChecks)
+      );
     }).overrideAttrs
       {
         passthru = exampleChecks;
