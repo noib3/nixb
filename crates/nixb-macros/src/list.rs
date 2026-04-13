@@ -11,7 +11,7 @@ pub(crate) fn expand(input: TokenStream) -> syn::Result<TokenStream> {
     let List { values } = syn::parse2(input)?;
 
     Ok(quote! {
-        ::nixb::list::LiteralList::new((#values))
+        ::nixb::list::StaticList::new((#values))
     })
 }
 
