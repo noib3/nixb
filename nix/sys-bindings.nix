@@ -1,4 +1,5 @@
 {
+  fetchFromGitHub,
   lib,
   llvmPackages,
   makeRustPlatform,
@@ -7,7 +8,6 @@
   rustfmt,
   # --
   rust,
-  nixSources,
 }:
 
 let
@@ -51,7 +51,9 @@ let
         OUTPUT_FILE="$out/${moduleName}.rs" ${lib.getExe sysBindingsGenerator}
       '';
 
-  generatedBindings = lib.mapAttrsToList mkSysBindingsFor nixSources;
+  generatedBindings = lib.mapAttrsToList mkSysBindingsFor (
+    import ./nix-sources.nix { inherit fetchFromGitHub; }
+  );
 in
 runCommand "sys-bindings" { } ''
   mkdir -p "$out"

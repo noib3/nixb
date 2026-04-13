@@ -38,6 +38,10 @@
         treefmt-nix.lib.evalModule pkgs {
           projectRootFile = "flake.nix";
 
+          settings.global.excludes = [
+            "crates/nixb-sys/src/bindings/*.rs"
+          ];
+
           programs.nixfmt = {
             enable = true;
             width = 80;
@@ -45,7 +49,7 @@
 
           programs.rustfmt = {
             enable = true;
-            package = (pkgs.rustfmt.override { asNightly = true; });
+            package = pkgs.rustfmt.override { asNightly = true; };
           };
 
           settings.formatter.rustfmt.options = [
@@ -56,19 +60,29 @@
     in
     {
       packages = forEachSystem (
-        system: pkgs: {
+        system: pkgs:
+        let
+          nixPackages = pkgs.callPackage ./nix/nix-packages.nix {
+            inherit nixpkgs;
+          };
+        in
+        {
           sys-bindings = pkgs.callPackage ./nix/sys-bindings.nix {
             rust = mkRustToolchain pkgs;
-            nixSources = import ./nix/nix-sources.nix {
-              inherit (pkgs) fetchFromGitHub;
-            };
+          };
+          examples = pkgs.callPackage ./nix/examples.nix {
+            inherit nixPackages;
+            rust = mkRustToolchain pkgs;
+          };
+          check-examples = pkgs.callPackage ./nix/check-examples.nix {
+            inherit nixPackages;
+            examplesPackages = self.packages.${system}.examples;
           };
         }
       );
 
       apps = forEachSystem (
-        system: pkgs:
-        {
+        system: pkgs: {
           update-bindings-generator-lockfile = {
             type = "app";
             program = nixpkgs.lib.getExe (
@@ -77,6 +91,10 @@
               }
             );
           };
+          check-examples = nixpkgs.lib.mapAttrs (_name: check: {
+            type = "app";
+            program = nixpkgs.lib.getExe check;
+          }) self.packages.${system}.check-examples;
           update-sys-bindings = {
             type = "app";
             program = nixpkgs.lib.getExe (
@@ -86,19 +104,6 @@
             );
           };
         }
-        # Workaround for https://github.com/NixOS/nix/issues/8881 so that we
-        # can run individual checks with `nix run .#check-<foo>`.
-        // (nixpkgs.lib.mapAttrs' (name: check: {
-          name = "check-${name}";
-          value = {
-            type = "app";
-            program =
-              (pkgs.writeShellScript "check-${name}" ''
-                # Force evaluation of ${check}.
-                echo -e "\033[1;32m✓\033[0m Check '${name}' passed"
-              '').outPath;
-          };
-        }) self.checks.${system})
       );
 
       devShells = forEachSystem (
@@ -109,12 +114,12 @@
             ];
             nativeBuildInputs = [
               pkgs.pkg-config
+              (pkgs.rustfmt.override { asNightly = true; })
               ((mkRustToolchain pkgs).override {
                 extensions = [
                   "clippy"
                   "rust-analyzer"
                   "rust-src"
-                  "rustfmt"
                 ];
               })
             ];
@@ -134,8 +139,9 @@
       );
 
       checks = forEachSystem (
-        _system: pkgs: {
+        system: pkgs: {
           formatting = (mkTreefmt pkgs).config.build.check self;
+          examples = self.packages.${system}.check-examples;
         }
       );
     };
