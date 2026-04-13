@@ -27,10 +27,10 @@ let
       runtimeInputs = [ nixPackage ];
       text = ''
         for plugin_file in ${examplePackage}/lib/*${sharedLibraryExt}; do
-          printf ':q\n' | \
-            ${lib.getExe nixPackage} repl \
-              --option plugin-files "$plugin_file" \
-              >/dev/null
+          ${lib.getExe nixPackage} eval \
+            --option plugin-files "$plugin_file" \
+            --expr null \
+            >/dev/null
         done
       '';
     };

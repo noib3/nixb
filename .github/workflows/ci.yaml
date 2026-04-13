@@ -20,18 +20,20 @@ jobs:
         run: nix run .#check-formatting
 
   examples:
-    name: Run examples (Nix ${{ replace(matrix.nix-feature, '-', '.') }})
+    name: Run examples (Nix ${{ matrix.nix-version }})
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        nix-feature:
-          - 2-32
-          - 2-33
-          - 2-34
+        nix-version:
+          - 2.32
+          - 2.33
+          - 2.34
     steps:
       - uses: actions/checkout@v6
       - uses: DeterminateSystems/nix-installer-action@main
       - uses: DeterminateSystems/magic-nix-cache-action@main
       - name: Run example checks
-        run: nix run .#check-examples.nix-${{ matrix.nix-feature }}
+        run: |
+          nix_feature=${{ matrix.nix-version }}
+          nix run .#check-examples.nix-${nix_feature//./-}

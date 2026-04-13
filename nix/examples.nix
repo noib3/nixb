@@ -15,6 +15,29 @@ let
     rustc = rust;
   };
 
+  examplesSrc =
+    let
+      root = toString ../.;
+      keepRootFile = name: name == "Cargo.lock" || (lib.hasSuffix ".toml" name);
+    in
+    lib.cleanSourceWith {
+      src = ../.;
+      filter =
+        path: _type:
+        let
+          pathStr = toString path;
+          relPath = lib.removePrefix (root + "/") pathStr;
+          parts = lib.splitString "/" relPath;
+          topLevel = builtins.head parts;
+        in
+        pathStr == root
+        || builtins.elem topLevel [
+          "crates"
+          "examples"
+        ]
+        || (builtins.length parts == 1 && keepRootFile relPath);
+    };
+
   sharedLibraryExt = stdenv.hostPlatform.extensions.sharedLibrary;
 
   mkExamplePackage =
@@ -25,7 +48,7 @@ let
     rustPlatform.buildRustPackage {
       pname = "example-${exampleName}-${nixFeature}";
       version = "0.1.0";
-      src = lib.cleanSource ../.;
+      src = examplesSrc;
       cargoLock.lockFile = ../Cargo.lock;
       strictDeps = true;
       doCheck = false;
