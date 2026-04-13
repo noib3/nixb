@@ -518,7 +518,7 @@ impl<Owner: ValueOwner> NixDerivation<Owner> {
     {
         self.inner
             .get::<NixLambda<_>>(c"overrideAttrs", ctx)?
-            .call(function::<NixAttrset<Borrowed<'a>>, _>(fun), ctx)?
+            .call(function::<NixAttrset<Borrowed<'a>>>(fun), ctx)?
             .force_into(ctx)
     }
 

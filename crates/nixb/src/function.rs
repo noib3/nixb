@@ -242,6 +242,19 @@ pub trait Function<'args> {
 }
 
 /// TODO: docs.
+pub trait IntoFunction<'a, A: Args<'a>> {
+    #[doc(hidden)]
+    type Output: IntoValue + 'a;
+
+    #[doc(hidden)]
+    fn call(
+        &mut self,
+        args: A::Values,
+        ctx: &mut Context,
+    ) -> Result<Self::Output>;
+}
+
+/// TODO: docs.
 pub trait Arg<'a> {
     /// TODO: docs.
     const NAME: &'static CStr;
@@ -269,12 +282,11 @@ pub trait Args<'a> {
 
 /// TODO: docs.
 #[inline]
-pub fn function<'a, A, Res>(
-    mut fun: impl FnMut(A::Values, &mut Context) -> Res + 'static,
+pub fn function<'a, A>(
+    mut fun: impl IntoFunction<'a, A> + 'static,
 ) -> impl Function<'a> + Value + 'static
 where
     A: Args<'a> + 'a,
-    Res: IntoResult<Output: IntoValue, Error: Into<Error>> + 'a,
 {
     struct PassthroughArgs;
 
@@ -334,7 +346,7 @@ where
 
     let wrapped_fun = move |args: ArgsList<'a>, ctx: &mut Context| {
         let args = A::values_from_args_list(args, ctx)?;
-        fun(args, ctx).into_result().map_err(Into::into)
+        fun.call(args, ctx)
     };
 
     Wrapper { args_names: A::NAMES, fun: wrapped_fun }
@@ -364,6 +376,26 @@ impl<'a> ArgsList<'a> {
         // argument has been initialized.
         let owner = unsafe { Borrowed::new(arg_ptr) };
         NixValue::new(owner)
+    }
+}
+
+impl<'a, A, F, Res> IntoFunction<'a, A> for F
+where
+    A: Args<'a> + 'a,
+    F: FnMut(A::Values, &mut Context) -> Res + 'static,
+    Res: IntoResult,
+    Res::Output: IntoValue + 'a,
+    Res::Error: Into<Error>,
+{
+    type Output = Res::Output;
+
+    #[inline]
+    fn call(
+        &mut self,
+        args: A::Values,
+        ctx: &mut Context,
+    ) -> Result<Self::Output> {
+        (self)(args, ctx).into_result().map_err(Into::into)
     }
 }
 
