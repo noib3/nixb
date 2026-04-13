@@ -3,7 +3,6 @@ use std::ffi::CString;
 use proc_macro2::{Literal, TokenStream};
 use quote::{ToTokens, quote};
 use syn::DeriveInput;
-use syn::spanned::Spanned;
 
 #[inline]
 pub(crate) fn expand(input: DeriveInput) -> syn::Result<TokenStream> {
@@ -13,7 +12,7 @@ pub(crate) fn expand(input: DeriveInput) -> syn::Result<TokenStream> {
 
     Ok(quote! {
         impl ::nixb::primop::PrimOp for #struct_name {
-            const DOCS: &'static ::core::ffi::CStr = #docs;
+            const DOCS: ::core::option::Option<&'static ::core::ffi::CStr> = #docs;
 
             const NAME: &'static ::nixb::Utf8CStr = unsafe {
                 ::nixb::Utf8CStr::new_unchecked(#camel_case_name)
@@ -65,15 +64,13 @@ fn docs(input: &DeriveInput) -> syn::Result<impl ToTokens> {
         }
     }
 
-    if docs.is_empty() {
-        Err(syn::Error::new(
-            input.span(),
-            "PrimOp derive requires a doc comment on the struct",
-        ))
+    Ok(if docs.is_empty() {
+        quote! { ::core::option::Option::None }
     } else {
         // SAFETY: we checked for NUL bytes while iterating over the
         // attributes.
         let docs = unsafe { CString::from_vec_unchecked(docs.into_bytes()) };
-        Ok(Literal::c_string(&docs))
-    }
+        let docs_literal = Literal::c_string(&docs);
+        quote! { ::core::option::Option::Some(#docs_literal) }
+    })
 }

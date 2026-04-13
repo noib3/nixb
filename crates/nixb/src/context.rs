@@ -64,7 +64,7 @@ impl Context<'_, Entrypoint> {
                     primop.args_arity().into(),
                     P::NAME.as_c_str().as_ptr(),
                     primop.args_names().as_ptr().cast_mut(),
-                    P::DOCS.as_ptr(),
+                    P::DOCS.map(CStr::as_ptr).unwrap_or(ptr::null()),
                     primop.into_userdata(),
                 )
             })?;
