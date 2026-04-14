@@ -28,12 +28,20 @@ pub trait Thunk {
 
     /// TODO: docs.
     #[inline]
-    fn into_value(self) -> impl Value + 'static
+    fn into_value(self) -> impl Thunk + Value + 'static
     where
         Self: Sized + 'static,
         Self::Output: IntoValue,
     {
         struct Wrapper<T>(T);
+
+        impl<T: Thunk> Thunk for Wrapper<T> {
+            type Output = T::Output;
+
+            fn force(self, ctx: &mut Context) -> Result<Self::Output> {
+                self.0.force(ctx)
+            }
+        }
 
         impl<T: Thunk<Output: IntoValue> + 'static> Value for Wrapper<T> {
             #[inline]
@@ -129,6 +137,17 @@ pub struct NixThunk<Owner = Owned> {
     value: NixValue<Owner>,
 }
 
+/// TODO: docs.
+pub fn thunk<F, MaybeRes>(fun: F) -> impl Thunk + Value + 'static
+where
+    F: FnOnce(&mut Context) -> MaybeRes + 'static,
+    MaybeRes: IntoResult,
+    MaybeRes::Output: IntoValue,
+    MaybeRes::Error: Into<Error>,
+{
+    Thunk::into_value(fun)
+}
+
 impl<Owner: ValueOwner> NixThunk<Owner> {
     /// TODO: docs.
     #[inline]
@@ -200,7 +219,7 @@ impl<Owner: ValueOwner> Thunk for NixThunk<Owner> {
     }
 
     #[inline]
-    fn into_value(self) -> impl Value + 'static
+    fn into_value(self) -> impl Thunk + Value + 'static
     where
         Self: Sized + 'static,
     {
