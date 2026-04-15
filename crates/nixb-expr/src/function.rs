@@ -360,6 +360,9 @@ pub struct ArgsList<'a> {
     _lifetime: PhantomData<&'a [*mut nixb_sys::Value]>,
 }
 
+#[doc(hidden)]
+pub struct NoArgs;
+
 impl<'a> ArgsList<'a> {
     /// Returns the value at the given argument index.
     ///
@@ -379,23 +382,16 @@ impl<'a> ArgsList<'a> {
     }
 }
 
-impl<'a, A, F, Res> IntoFunction<'a, A> for F
-where
-    A: Args<'a> + 'a,
-    F: FnMut(A::Values, &mut Context) -> Res + 'static,
-    Res: IntoResult,
-    Res::Output: IntoValue + 'a,
-    Res::Error: Into<Error>,
-{
-    type Output = Res::Output;
+impl<T: IntoValue + Clone> Function<'_> for T {
+    type Args = NoArgs;
 
     #[inline]
-    fn call(
+    fn call<'eval>(
         &mut self,
-        args: A::Values,
-        ctx: &mut Context,
-    ) -> Result<Self::Output> {
-        (self)(args, ctx).into_result().map_err(Into::into)
+        _: (),
+        ctx: &mut Context<'eval>,
+    ) -> impl Value + use<'eval, T> {
+        self.clone().into_value(ctx)
     }
 }
 
@@ -418,6 +414,40 @@ impl<'a, A: Arg<'a>> Args<'a> for A {
         ctx: &mut Context,
     ) -> Result<Self::Values> {
         A::Value::try_from_value(unsafe { args_list.get(0) }, ctx)
+    }
+}
+
+impl Args<'_> for NoArgs {
+    type Values = ();
+
+    const NAMES: &'static [*const c_char] = &[ptr::null()];
+
+    #[inline]
+    fn values_from_args_list(
+        _: ArgsList<'_>,
+        _: &mut Context,
+    ) -> Result<Self::Values> {
+        Ok(())
+    }
+}
+
+impl<'a, A, F, Res> IntoFunction<'a, A> for F
+where
+    A: Args<'a> + 'a,
+    F: FnMut(A::Values, &mut Context) -> Res + 'static,
+    Res: IntoResult,
+    Res::Output: IntoValue + 'a,
+    Res::Error: Into<Error>,
+{
+    type Output = Res::Output;
+
+    #[inline]
+    fn call(
+        &mut self,
+        args: A::Values,
+        ctx: &mut Context,
+    ) -> Result<Self::Output> {
+        (self)(args, ctx).into_result().map_err(Into::into)
     }
 }
 

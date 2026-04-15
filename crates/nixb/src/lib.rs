@@ -2,7 +2,6 @@
 
 #[cfg(feature = "expr")]
 pub use nixb_expr as expr;
-
 #[cfg(feature = "plugin")]
 pub use nixb_plugin as plugin;
 
@@ -18,7 +17,6 @@ pub mod prelude {
         pub use nixb_expr::error::*;
         pub use nixb_expr::function::*;
         pub use nixb_expr::list::*;
-        pub use nixb_expr::primop::*;
         pub use nixb_expr::thunk::*;
         pub use nixb_expr::value::*;
     }

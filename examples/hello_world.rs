@@ -1,7 +1,8 @@
+use nixb::plugin::{ContextExt, Entrypoint};
 use nixb::prelude::*;
 
 /// A simple primop.
-#[derive(nixb::PrimOp, Clone, Copy)]
+#[derive(nixb::plugin::PrimOp, Clone, Copy)]
 struct HelloWorld;
 
 impl IntoValue for HelloWorld {
@@ -11,7 +12,7 @@ impl IntoValue for HelloWorld {
     }
 }
 
-#[nixb::plugin]
+#[nixb::plugin::entry]
 fn hello_world(ctx: &mut Context<Entrypoint>) {
     ctx.register_primop(HelloWorld);
 }

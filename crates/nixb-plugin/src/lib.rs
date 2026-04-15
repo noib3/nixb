@@ -2,16 +2,15 @@
 
 #![allow(clippy::undocumented_unsafe_blocks)]
 #![cfg_attr(not(feature = "std"), no_std)]
-#![cfg_attr(nightly, feature(const_type_name))]
-#![cfg_attr(nightly, feature(generic_const_exprs))]
 
 extern crate alloc;
 
+mod context;
 #[cfg(feature = "dlopen")]
 mod dlopen;
-mod entry;
+mod entrypoint;
 pub mod primop;
-pub use nixb_macros::{PrimOp, plugin};
-
+pub use context::{ContextExt, Entrypoint};
 #[doc(hidden)]
-pub use entry::entry;
+pub use entrypoint::entrypoint;
+pub use nixb_macros::{PrimOp, entry};

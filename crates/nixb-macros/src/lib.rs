@@ -3,7 +3,7 @@
 mod attrset;
 mod attrset_derive;
 mod list;
-mod plugin;
+mod plugin_entry;
 mod primop;
 mod try_from_value;
 mod value;
@@ -38,9 +38,9 @@ pub fn list(input: TokenStream) -> TokenStream {
 
 /// Marks the entrypoint function of a Nix plugin.
 #[proc_macro_attribute]
-pub fn plugin(attr: TokenStream, item: TokenStream) -> TokenStream {
+pub fn entry(attr: TokenStream, item: TokenStream) -> TokenStream {
     let item = parse_macro_input!(item as syn::ItemFn);
-    plugin::expand(attr, item)
+    plugin_entry::expand(attr, item)
         .unwrap_or_else(syn::Error::into_compile_error)
         .into()
 }

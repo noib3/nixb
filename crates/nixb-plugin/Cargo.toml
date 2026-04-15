@@ -7,11 +7,16 @@ license.workspace = true
 
 [features]
 default = ["dlopen"]
-dlopen = ["dep:libc", "dep:libloading", "dep:memchr", "dep:rusqlite"]
+dlopen = ["std", "dep:libc", "dep:libloading", "dep:memchr", "dep:rusqlite"]
+nix-2-32 = ["nixb-expr/nix-2-32", "nixb-sys/nix-2-32"]
+nix-2-33 = ["nix-2-32", "nixb-expr/nix-2-33", "nixb-sys/nix-2-33"]
+nix-2-34 = ["nix-2-33", "nixb-expr/nix-2-34", "nixb-sys/nix-2-34"]
+std = []
 
 [dependencies]
 nixb-expr = { workspace = true }
 nixb-macros = { workspace = true }
+nixb-sys = { workspace = true }
 
 libc = { workspace = true, optional = true }
 libloading = { workspace = true, optional = true }

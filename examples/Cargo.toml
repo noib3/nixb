@@ -13,7 +13,7 @@ nix-2-33 = ["nixb/nix-2-33"]
 nix-2-34 = ["nixb/nix-2-34"]
 
 [dependencies]
-nixb = { workspace = true, features = ["dlopen"] }
+nixb = { workspace = true, features = ["dlopen", "expr", "plugin"] }
 
 [[example]]
 name = "hello_world"
