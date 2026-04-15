@@ -14,10 +14,11 @@ use core::result::Result as CoreResult;
 use core::{fmt, mem};
 
 pub use nixb_macros::attrset;
+use nixb_result::{Error, ErrorKind, Result};
 
 use crate::callable::{Callable, NixLambda};
 use crate::context::{AttrsetBuilder, Context};
-use crate::error::{Error, ErrorKind, Result, TypeMismatchError};
+use crate::error::TypeMismatchError;
 use crate::function::function;
 use crate::tuple::Tuple;
 use crate::value::{

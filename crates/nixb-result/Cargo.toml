@@ -1,0 +1,18 @@
+[package]
+name = "nixb-result"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[features]
+default = ["std"]
+std = []
+
+[dependencies]
+# We only need nixb-sys fro the err_NIX_ERR_* error codes. They're unlikely to
+# change between releases, so we can just pick an arbitrary Nix version.
+nixb-sys = { workspace = true, features = ["nix-2-34"] }
+
+[lints]
+workspace = true

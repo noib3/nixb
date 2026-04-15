@@ -6,9 +6,10 @@ use core::ops::Deref;
 use core::ptr::{self, NonNull};
 
 pub use nixb_macros::list;
+use nixb_result::Result;
 
 use crate::context::{Context, ListBuilder};
-use crate::error::{Result, TypeMismatchError};
+use crate::error::TypeMismatchError;
 use crate::value::{
     Borrowed,
     IntoValue,

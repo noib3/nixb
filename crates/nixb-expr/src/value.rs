@@ -8,14 +8,10 @@ use core::marker::PhantomData;
 use core::ptr::{self, NonNull};
 use core::{fmt, slice};
 
+use nixb_result::{Error, Result};
+
 use crate::context::Context;
-use crate::error::{
-    Error,
-    Result,
-    TryFromI64Error,
-    TryIntoI64Error,
-    TypeMismatchError,
-};
+use crate::error::{TryFromI64Error, TryIntoI64Error, TypeMismatchError};
 use crate::list::{List, NixList};
 use crate::tuple::Tuple;
 

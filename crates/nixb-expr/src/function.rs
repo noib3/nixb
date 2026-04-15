@@ -6,9 +6,10 @@ use core::marker::PhantomData;
 use core::ptr::{self, NonNull};
 use core::{any, mem};
 
+use nixb_result::{Error, Result};
+
 use crate::IntoResult;
 use crate::context::{Context, EvalState};
-use crate::error::{Error, Result};
 use crate::value::{
     Borrowed,
     IntoValue,

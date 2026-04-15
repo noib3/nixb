@@ -18,6 +18,7 @@ std = []
 [dependencies]
 nixb-cpp = { workspace = true }
 nixb-macros = { workspace = true }
+nixb-result = { workspace = true }
 nixb-sys = { workspace = true }
 
 compact_str = { workspace = true, optional = true }

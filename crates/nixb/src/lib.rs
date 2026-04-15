@@ -6,6 +6,8 @@ pub use nixb_expr as expr;
 #[cfg(feature = "plugin")]
 #[doc(inline)]
 pub use nixb_plugin as plugin;
+#[doc(inline)]
+pub use nixb_result as result;
 
 pub mod prelude {
     //! TODO: docs.

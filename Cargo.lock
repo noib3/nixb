@@ -156,6 +156,7 @@ version = "0.1.0"
 dependencies = [
  "nixb-expr",
  "nixb-plugin",
+ "nixb-result",
 ]
 
 [[package]]
@@ -182,6 +183,7 @@ dependencies = [
  "either",
  "nixb-cpp",
  "nixb-macros",
+ "nixb-result",
  "nixb-sys",
  "rustc_version",
  "smallvec",
@@ -207,6 +209,13 @@ dependencies = [
  "nixb-macros",
  "nixb-sys",
  "rusqlite",
+]
+
+[[package]]
+name = "nixb-result"
+version = "0.1.0"
+dependencies = [
+ "nixb-sys",
 ]
 
 [[package]]

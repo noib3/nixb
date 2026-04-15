@@ -19,9 +19,9 @@ impl ContextExt for Context<'_, Entrypoint> {
     #[inline]
     fn register_primop<P: PrimOp>(&mut self, primop: P) -> &mut Self {
         let try_block = || {
-            let primop_ptr = self.with_ptr(|ctx| unsafe {
+            let primop_ptr = self.with_raw(|ctx| unsafe {
                 nixb_sys::alloc_primop(
-                    ctx.as_ptr(),
+                    ctx,
                     Some(P::callback()),
                     primop.args_arity().into(),
                     P::NAME.as_c_str().as_ptr(),

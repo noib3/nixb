@@ -2,9 +2,11 @@
 
 use core::ptr;
 
+use nixb_result::Result;
+
 use crate::attrset::NixAttrset;
 use crate::context::Context;
-use crate::error::{Result, TypeMismatchError};
+use crate::error::TypeMismatchError;
 use crate::thunk::NixThunk;
 use crate::value::{
     IntoValue,

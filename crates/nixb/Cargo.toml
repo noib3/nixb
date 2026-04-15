@@ -27,6 +27,7 @@ std = ["nixb-expr?/std"]
 [dependencies]
 nixb-expr = { workspace = true, optional = true }
 nixb-plugin = { workspace = true, optional = true }
+nixb-result = { workspace = true }
 
 [lints]
 workspace = true

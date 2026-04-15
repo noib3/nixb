@@ -7,9 +7,10 @@ use core::ops::{Deref, DerefMut};
 use core::ptr::{self, NonNull};
 use core::slice;
 
+use nixb_result::{Error, ErrorKind, Result};
+
 use crate::attrset::NixAttrset;
 use crate::builtins::Builtins;
-use crate::error::{Error, ErrorKind, Result};
 use crate::value::{
     Borrowed,
     NixValue,
@@ -180,15 +181,6 @@ impl<State> Context<'_, State> {
             state,
             _lifetime: PhantomData,
         }
-    }
-
-    /// TODO: docs.
-    #[inline]
-    pub fn with_ptr<T>(
-        &mut self,
-        fun: impl FnOnce(NonNull<nixb_sys::c_context>) -> T,
-    ) -> Result<T> {
-        self.inner.with_ptr(fun)
     }
 
     /// TODO: docs.
@@ -375,16 +367,6 @@ impl ContextInner {
     #[inline]
     fn new(inner: NonNull<nixb_sys::c_context>) -> Self {
         Self { ptr: inner }
-    }
-
-    /// TODO: docs.
-    #[inline]
-    fn with_ptr<T>(
-        &mut self,
-        fun: impl FnOnce(NonNull<nixb_sys::c_context>) -> T,
-    ) -> Result<T> {
-        let ret = fun(self.ptr);
-        self.check_err().map(|()| ret)
     }
 
     /// Same as [`with_raw`](Self::with_raw), but provides the callback with a
