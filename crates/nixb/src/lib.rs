@@ -1,5 +1,7 @@
 //! TODO: docs.
 
+#[doc(inline)]
+pub use nixb_context as context;
 #[cfg(feature = "expr")]
 #[doc(inline)]
 pub use nixb_expr as expr;

@@ -9,9 +9,23 @@ license.workspace = true
 default = ["dlopen", "nix-2-34"]
 
 # Nix versions.
-nix-2-32 = ["nixb-expr?/nix-2-32"]
-nix-2-33 = ["nix-2-32", "nixb-expr?/nix-2-33"]
-nix-2-34 = ["nix-2-33", "nixb-expr?/nix-2-34"]
+nix-2-32 = [
+  "nixb-context/nix-2-32",
+  "nixb-expr?/nix-2-32",
+  "nixb-plugin?/nix-2-32",
+]
+nix-2-33 = [
+  "nix-2-32",
+  "nixb-context/nix-2-33",
+  "nixb-expr?/nix-2-33",
+  "nixb-plugin?/nix-2-33",
+]
+nix-2-34 = [
+  "nix-2-33",
+  "nixb-context/nix-2-34",
+  "nixb-expr?/nix-2-34",
+  "nixb-plugin?/nix-2-34",
+]
 
 # Module-enabling features.
 expr = ["nixb-expr"]
@@ -25,9 +39,11 @@ smallvec = ["nixb-expr?/smallvec"]
 std = ["nixb-expr?/std"]
 
 [dependencies]
+nixb-context = { workspace = true }
+nixb-result = { workspace = true }
+
 nixb-expr = { workspace = true, optional = true }
 nixb-plugin = { workspace = true, optional = true }
-nixb-result = { workspace = true }
 
 [lints]
 workspace = true
