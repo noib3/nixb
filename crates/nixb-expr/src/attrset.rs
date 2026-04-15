@@ -490,7 +490,7 @@ impl<Owner: ValueOwner> NixDerivation<Owner> {
     #[inline]
     pub fn override_attrs<'a>(
         &self,
-        fun: impl Function<'a, Args = NixAttrset<Borrowed<'a>>> + 'static,
+        fun: impl Function<Args<'a> = NixAttrset<Borrowed<'a>>> + 'static,
         ctx: &mut Context,
     ) -> Result<NixDerivation> {
         self.inner

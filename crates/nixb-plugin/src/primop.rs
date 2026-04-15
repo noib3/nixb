@@ -2,11 +2,11 @@
 
 use core::ffi::CStr;
 
-use nixb_expr::Utf8CStr;
 use nixb_expr::function::Function;
+use nixb_expr::Utf8CStr;
 
 /// TODO: docs.
-pub trait PrimOp: for<'a> Function<'a> + 'static {
+pub trait PrimOp: Function + 'static {
     #[doc(hidden)]
     const DOCS: Option<&'static CStr>;
 
