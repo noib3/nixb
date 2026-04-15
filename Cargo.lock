@@ -154,17 +154,11 @@ checksum = "f52b00d39961fc5b2736ea853c9cc86238e165017a493d1d5c8eac6bdc4cc273"
 name = "nixb"
 version = "0.1.0"
 dependencies = [
- "compact_str",
- "either",
  "libc",
  "libloading",
  "memchr",
- "nixb-cpp",
- "nixb-macros",
- "nixb-sys",
+ "nixb-expr",
  "rusqlite",
- "rustc_version",
- "smallvec",
 ]
 
 [[package]]
@@ -181,6 +175,19 @@ name = "nixb-examples"
 version = "0.1.0"
 dependencies = [
  "nixb",
+]
+
+[[package]]
+name = "nixb-expr"
+version = "0.1.0"
+dependencies = [
+ "compact_str",
+ "either",
+ "nixb-cpp",
+ "nixb-macros",
+ "nixb-sys",
+ "rustc_version",
+ "smallvec",
 ]
 
 [[package]]

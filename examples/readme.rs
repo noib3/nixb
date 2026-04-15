@@ -10,10 +10,6 @@ struct MyAttrset {
     field2: u8,
 }
 
-fn mk_hello(name: String, _ctx: &mut Context) -> String {
-    format!("Hello {name}!")
-}
-
 fn expensive_computation(_ctx: &mut Context) -> u8 {
     std::thread::sleep(std::time::Duration::from_secs(2));
     42
@@ -25,8 +21,8 @@ impl IntoValue for MyPlugin {
             listSameType: ["foo", "baz", "baz"],
             listDifferentTypes: list!["string", 42],
             myAttrset: MyAttrset::default(),
-            mkHello: function::<String>(mk_hello),
-            lazyEval: Thunk::into_value(expensive_computation),
+            mkHello: function::<String>(|name| format!("Hello {name}!")),
+            lazyEval2: thunk(|| 42),
         }
     }
 }

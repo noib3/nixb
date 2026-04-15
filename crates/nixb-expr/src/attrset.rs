@@ -15,30 +15,25 @@ use core::{fmt, mem};
 
 pub use nixb_macros::attrset;
 
-use crate::IntoResult;
-use crate::context::AttrsetBuilder;
+use crate::callable::{Callable, NixLambda};
+use crate::context::{AttrsetBuilder, Context};
 use crate::error::{Error, ErrorKind, Result, TypeMismatchError};
 use crate::function::function;
-use crate::prelude::{
-    Callable,
-    Context,
-    IntoValue,
-    NixLambda,
-    Utf8CStr,
-    Value,
-    ValueKind,
-};
 use crate::tuple::Tuple;
 use crate::value::{
     Borrowed,
+    IntoValue,
     IntoValues,
     NixValue,
     Owned,
     TryFromValue,
     UninitValue,
+    Value,
+    ValueKind,
     ValueOwner,
     Values,
 };
+use crate::{IntoResult, Utf8CStr};
 
 /// TODO: docs.
 pub trait Attrset {

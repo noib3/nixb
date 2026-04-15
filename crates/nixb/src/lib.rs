@@ -7,43 +7,31 @@
 
 extern crate alloc;
 
-pub mod attrset;
-pub mod builtins;
-pub mod callable;
-pub mod context;
 #[cfg(feature = "dlopen")]
 mod dlopen;
 mod entry;
-pub mod error;
-pub mod function;
-mod into_result;
-pub mod list;
-mod never;
 pub mod primop;
-pub mod thunk;
-pub mod tuple;
-mod utf8_cstr;
-pub mod value;
 
 #[doc(hidden)]
 pub use entry::entry;
-pub use into_result::IntoResult;
-pub use nixb_macros::{Attrset, PrimOp, TryFromValue, Value, plugin};
-#[doc(hidden)]
-pub use nixb_sys as sys;
-pub use utf8_cstr::Utf8CStr;
 
 pub mod prelude {
     //! TODO: docs.
 
-    pub use crate::Utf8CStr;
-    pub use crate::attrset::*;
-    pub use crate::callable::*;
-    pub use crate::context::*;
-    pub use crate::error::*;
-    pub use crate::function::*;
-    pub use crate::list::*;
-    pub use crate::primop::*;
-    pub use crate::thunk::*;
-    pub use crate::value::*;
+    #[cfg(feature = "expr")]
+    mod expr {
+        pub use nixb_expr::Utf8CStr;
+        pub use nixb_expr::attrset::*;
+        pub use nixb_expr::callable::*;
+        pub use nixb_expr::context::*;
+        pub use nixb_expr::error::*;
+        pub use nixb_expr::function::*;
+        pub use nixb_expr::list::*;
+        pub use nixb_expr::primop::*;
+        pub use nixb_expr::thunk::*;
+        pub use nixb_expr::value::*;
+    }
+
+    #[cfg(feature = "expr")]
+    pub use expr::*;
 }

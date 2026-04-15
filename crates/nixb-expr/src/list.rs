@@ -7,9 +7,8 @@ use core::ptr::{self, NonNull};
 
 pub use nixb_macros::list;
 
-use crate::context::ListBuilder;
-use crate::error::TypeMismatchError;
-use crate::prelude::{Context, Result, Value, ValueKind};
+use crate::context::{Context, ListBuilder};
+use crate::error::{Result, TypeMismatchError};
 use crate::value::{
     Borrowed,
     IntoValue,
@@ -18,6 +17,8 @@ use crate::value::{
     Owned,
     TryFromValue,
     UninitValue,
+    Value,
+    ValueKind,
     ValueOwner,
     Values,
 };
