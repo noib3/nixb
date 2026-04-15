@@ -268,33 +268,74 @@ pub trait Args<'a>: Sized {
 
 /// TODO: docs.
 #[inline]
+#[allow(clippy::too_many_lines)]
 pub fn function<'a, A: Args<'a>>(
     fun: impl FnMutOutputIntoResult<A> + 'static,
 ) -> impl Function + Value + 'static {
-    struct Wrapper<A, F> {
+    type CallFn<F> =
+        for<'args, 'eval> fn(
+            &mut F,
+            ArgsList<'args>,
+            &mut Context<'eval>,
+        ) -> Result<NixValue<crate::value::Owned>>;
+
+    struct Wrapper<F> {
+        args_names: &'static [*const c_char],
+        call: CallFn<F>,
         fun: F,
-        _args: PhantomData<fn() -> A>,
     }
 
-    impl<'a, A, F> Function for Wrapper<A, F>
+    fn call_impl<'fixed, 'args, 'eval, A, F>(
+        fun: &mut F,
+        args_list: ArgsList<'args>,
+        ctx: &mut Context<'eval>,
+    ) -> Result<NixValue<crate::value::Owned>>
     where
-        A: Args<'a>,
-        F: FnMutOutputIntoResult<A>,
+        A: Args<'fixed>,
+        F: FnMutOutputIntoResult<A> + 'static,
     {
-        type Args<'a> = A;
+        // `function()` binds the decoded argument type to the construction
+        // lifetime, so we rebind the raw arguments before decoding them.
+        let args_list = unsafe {
+            mem::transmute::<ArgsList<'args>, ArgsList<'fixed>>(args_list)
+        };
+
+        let args = A::from_args_list(args_list, ctx)?;
+
+        let mut value =
+            fun.call(args).into_result().map_err(Into::into)?.into_value(ctx);
+
+        value.force_inline(ctx)?;
+
+        let dest = ctx.alloc_value()?;
+        value.write(dest, ctx)?;
+
+        // SAFETY: `write` initialized the allocated destination value.
+        let owner = unsafe { crate::value::Owned::new(dest.as_non_null()) };
+
+        Ok(NixValue::new(owner))
+    }
+
+    impl<F: 'static> Function for Wrapper<F> {
+        type Args<'args> = ArgsList<'args>;
 
         #[inline]
         fn call<'this, 'eval, 'args>(
             &'this mut self,
             args: Self::Args<'args>,
-            _ctx: &mut Context<'eval>,
+            ctx: &mut Context<'eval>,
         ) -> impl IntoResult<Output: IntoValue, Error: Into<Error>>
-        + use<'this, 'args, A, F> {
-            self.fun.call(args)
+        + use<'this, 'args, 'eval, F> {
+            (self.call)(&mut self.fun, args, ctx)
+        }
+
+        #[inline]
+        fn args_names(&self) -> &'static [*const c_char] {
+            self.args_names
         }
     }
 
-    impl<A, F> Value for Wrapper<A, F>
+    impl<F> Value for Wrapper<F>
     where
         Self: Function + 'static,
     {
@@ -309,7 +350,11 @@ pub fn function<'a, A: Args<'a>>(
         }
     }
 
-    Wrapper { fun, _args: PhantomData }
+    Wrapper {
+        args_names: A::NAMES,
+        call: |fun, args_list, ctx| call_impl(fun, args_list, ctx),
+        fun,
+    }
 }
 
 /// TODO: docs.
@@ -348,10 +393,7 @@ impl<'spec> Args<'spec> for ArgsList<'spec> {
     const NAMES: &'static [*const c_char] = unreachable!();
 
     #[inline]
-    fn from_args_list(
-        args_list: ArgsList<'spec>,
-        _: &mut Context,
-    ) -> Result<Self> {
+    fn from_args_list(args_list: Self, _: &mut Context) -> Result<Self> {
         Ok(args_list)
     }
 }
@@ -366,31 +408,6 @@ impl<T: IntoValue + Clone> Function for T {
         ctx: &mut Context<'eval>,
     ) -> impl Value + use<'this, 'args, 'eval, T> {
         self.clone().into_value(ctx)
-    }
-}
-
-mod private {
-    use super::*;
-
-    pub trait StaticArg: Sized {
-        fn value_from_arg<'a>(
-            value: NixValue<Borrowed<'a>>,
-            ctx: &mut Context,
-        ) -> Result<Self>;
-    }
-
-    impl<T> StaticArg for T
-    where
-        T: 'static,
-        for<'a> T: TryFromValue<NixValue<Borrowed<'a>>>,
-    {
-        #[inline]
-        fn value_from_arg<'a>(
-            value: NixValue<Borrowed<'a>>,
-            ctx: &mut Context,
-        ) -> Result<Self> {
-            T::try_from_value(value, ctx)
-        }
     }
 }
 
