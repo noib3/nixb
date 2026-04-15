@@ -1,19 +1,10 @@
 //! TODO: docs.
 
-#![allow(clippy::undocumented_unsafe_blocks)]
-#![cfg_attr(not(feature = "std"), no_std)]
-#![cfg_attr(nightly, feature(const_type_name))]
-#![cfg_attr(nightly, feature(generic_const_exprs))]
+#[cfg(feature = "expr")]
+pub use nixb_expr as expr;
 
-extern crate alloc;
-
-#[cfg(feature = "dlopen")]
-mod dlopen;
-mod entry;
-pub mod primop;
-
-#[doc(hidden)]
-pub use entry::entry;
+#[cfg(feature = "plugin")]
+pub use nixb_plugin as plugin;
 
 pub mod prelude {
     //! TODO: docs.

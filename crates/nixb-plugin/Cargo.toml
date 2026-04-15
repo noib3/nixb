@@ -7,7 +7,7 @@ license.workspace = true
 
 [features]
 default = ["dlopen"]
-dlopen = ["std", "dep:libc", "dep:libloading", "dep:memchr", "dep:rusqlite"]
+dlopen = ["dep:libc", "dep:libloading", "dep:memchr", "dep:rusqlite"]
 
 [dependencies]
 nixb-expr = { workspace = true }
