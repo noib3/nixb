@@ -1,12 +1,14 @@
 use core::ptr::NonNull;
 
-use crate::prelude::{Context, Entrypoint};
+use nixb_expr::context::Context;
+
+use crate::context::Entrypoint;
 
 pub type EntrypointFun = fn(&mut Context<Entrypoint>);
 
 #[doc(hidden)]
 #[inline]
-pub unsafe fn entry(entrypoint: EntrypointFun) {
+pub unsafe fn entrypoint(entrypoint: EntrypointFun) {
     #[cfg(feature = "dlopen")]
     crate::dlopen::open();
 

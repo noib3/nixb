@@ -1,4 +1,5 @@
-#![allow(missing_docs)]
+//! TODO: docs.
+
 #![no_std]
 
 mod bindings;

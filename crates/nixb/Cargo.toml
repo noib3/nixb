@@ -7,30 +7,26 @@ license.workspace = true
 
 [features]
 default = ["dlopen", "nix-2-34"]
-compact_str = ["dep:compact_str"]
-dlopen = ["std", "dep:libc", "dep:libloading", "dep:memchr", "dep:rusqlite"]
-either = ["dep:either"]
-nix-2-32 = ["nixb-cpp/nix-2-32", "nixb-sys/nix-2-32"]
-nix-2-33 = ["nix-2-32", "nixb-cpp/nix-2-33", "nixb-sys/nix-2-33"]
-nix-2-34 = ["nix-2-33", "nixb-cpp/nix-2-34", "nixb-sys/nix-2-34"]
-smallvec = ["dep:smallvec"]
-std = []
+
+# Nix versions.
+nix-2-32 = ["nixb-expr?/nix-2-32"]
+nix-2-33 = ["nix-2-32", "nixb-expr?/nix-2-33"]
+nix-2-34 = ["nix-2-33", "nixb-expr?/nix-2-34"]
+
+# Module-enabling features.
+expr = ["nixb-expr"]
+plugin = ["nixb-plugin"]
+
+# Passthrough features.
+compact_str = ["nixb-expr?/compact_str"]
+dlopen = ["nixb-plugin?/dlopen"]
+either = ["nixb-expr?/either"]
+smallvec = ["nixb-expr?/smallvec"]
+std = ["nixb-expr?/std"]
 
 [dependencies]
-nixb-cpp = { workspace = true }
-nixb-macros = { workspace = true }
-nixb-sys = { workspace = true }
-
-compact_str = { workspace = true, optional = true }
-either = { workspace = true, optional = true }
-libc = { workspace = true, optional = true }
-libloading = { workspace = true, optional = true }
-memchr = { workspace = true, optional = true }
-rusqlite = { workspace = true, optional = true }
-smallvec = { workspace = true, optional = true, features = ["const_generics"] }
-
-[build-dependencies]
-rustc_version = "0.4"
+nixb-expr = { workspace = true, optional = true }
+nixb-plugin = { workspace = true, optional = true }
 
 [lints]
 workspace = true

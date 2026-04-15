@@ -1,8 +1,8 @@
 //! TODO: docs.
 
 use crate::attrset::NixAttrset;
+use crate::callable::NixLambda;
 use crate::context::Context;
-use crate::prelude::NixLambda;
 use crate::value::Borrowed;
 
 /// TODO: docs.

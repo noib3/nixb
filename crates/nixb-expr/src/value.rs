@@ -8,6 +8,7 @@ use core::marker::PhantomData;
 use core::ptr::{self, NonNull};
 use core::{fmt, slice};
 
+use crate::context::Context;
 use crate::error::{
     Error,
     Result,
@@ -16,7 +17,6 @@ use crate::error::{
     TypeMismatchError,
 };
 use crate::list::{List, NixList};
-use crate::prelude::Context;
 use crate::tuple::Tuple;
 
 /// TODO: docs.

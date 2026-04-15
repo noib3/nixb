@@ -17,7 +17,7 @@ pub(crate) fn expand(
 
         #[unsafe(no_mangle)]
         unsafe extern "C" fn nix_plugin_entry() {
-            ::nixb::entry(#entrypoint_fn_name);
+            ::nixb::plugin::entrypoint(#entrypoint_fn_name);
         }
     })
 }

@@ -1,6 +1,5 @@
 //! TODO: docs.
 
-use alloc::vec::Vec;
 use core::ptr;
 
 use crate::attrset::NixAttrset;
@@ -87,14 +86,14 @@ pub trait Callable {
         fn new_args_array<V: Values>(
             _: &V,
         ) -> impl AsMut<[*mut nixb_sys::Value]> + use<V> {
-            core::array::from_fn::<_, V::LEN, _>(|_| ptr::null_mut())
+            core::array::from_fn::<_, { V::LEN }, _>(|_| ptr::null_mut())
         }
 
         #[cfg(not(nightly))]
         fn new_args_array<V: Values>(
             _: &V,
         ) -> impl AsMut<[*mut nixb_sys::Value]> + use<V> {
-            (0..V::LEN).map(|_| ptr::null_mut()).collect::<Vec<_>>()
+            (0..V::LEN).map(|_| ptr::null_mut()).collect::<alloc::vec::Vec<_>>()
         }
 
         fn init_args_array<Args: Values>(

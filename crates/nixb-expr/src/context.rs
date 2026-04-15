@@ -10,7 +10,6 @@ use core::slice;
 use crate::attrset::NixAttrset;
 use crate::builtins::Builtins;
 use crate::error::{Error, ErrorKind, Result};
-use crate::primop::PrimOp;
 use crate::value::{
     Borrowed,
     NixValue,
@@ -26,9 +25,6 @@ pub struct Context<'state, State = EvalState<'state>> {
     state: State,
     _lifetime: PhantomData<&'state ()>,
 }
-
-/// TODO: docs.
-pub struct Entrypoint {}
 
 /// TODO: docs.
 pub struct EvalState<'a> {
@@ -49,41 +45,6 @@ pub(crate) struct ListBuilder<'ctx, 'eval> {
 
 struct ContextInner {
     ptr: NonNull<nixb_sys::c_context>,
-}
-
-impl Context<'_, Entrypoint> {
-    /// Adds the given primop to the `builtins` attribute set.
-    #[track_caller]
-    #[inline]
-    pub fn register_primop<P: PrimOp>(&mut self, primop: P) -> &mut Self {
-        let try_block = || {
-            let primop_ptr = self.inner.with_ptr(|ctx| unsafe {
-                nixb_sys::alloc_primop(
-                    ctx.as_ptr(),
-                    Some(P::callback()),
-                    primop.args_arity().into(),
-                    P::NAME.as_c_str().as_ptr(),
-                    primop.args_names().as_ptr().cast_mut(),
-                    P::DOCS.map(CStr::as_ptr).unwrap_or(ptr::null()),
-                    primop.into_userdata(),
-                )
-            })?;
-
-            self.inner.with_raw(|ctx| unsafe {
-                nixb_sys::register_primop(ctx, primop_ptr)
-            })?;
-
-            self.inner.with_raw(|ctx| unsafe {
-                nixb_sys::gc_decref(ctx, primop_ptr.cast())
-            })
-        };
-
-        if let Err(err) = try_block() {
-            panic!("couldn't register primop {:?}: {err}", P::NAME);
-        }
-
-        self
-    }
 }
 
 impl<'eval> Context<'eval, EvalState<'eval>> {
@@ -211,11 +172,9 @@ impl<'eval> Context<'eval, EvalState<'eval>> {
 }
 
 impl<State> Context<'_, State> {
+    /// TODO: docs.
     #[inline]
-    pub(crate) fn new(
-        ctx_ptr: NonNull<nixb_sys::c_context>,
-        state: State,
-    ) -> Self {
+    pub fn new(ctx_ptr: NonNull<nixb_sys::c_context>, state: State) -> Self {
         Self {
             inner: ContextInner::new(ctx_ptr),
             state,
@@ -225,7 +184,16 @@ impl<State> Context<'_, State> {
 
     /// TODO: docs.
     #[inline]
-    pub(crate) fn with_raw<T>(
+    pub fn with_ptr<T>(
+        &mut self,
+        fun: impl FnOnce(NonNull<nixb_sys::c_context>) -> T,
+    ) -> Result<T> {
+        self.inner.with_ptr(fun)
+    }
+
+    /// TODO: docs.
+    #[inline]
+    pub fn with_raw<T>(
         &mut self,
         fun: impl FnOnce(*mut nixb_sys::c_context) -> T,
     ) -> Result<T> {
