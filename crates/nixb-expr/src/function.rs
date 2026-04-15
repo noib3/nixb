@@ -9,7 +9,11 @@ use core::{any, mem};
 use nixb_result::{Error, Result};
 
 use crate::IntoResult;
+use crate::attrset::{NixAttrset, NixDerivation};
+use crate::callable::{NixFunctor, NixLambda};
 use crate::context::{Context, EvalState};
+use crate::list::NixList;
+use crate::thunk::NixThunk;
 use crate::value::{
     Borrowed,
     IntoValue,
@@ -22,18 +26,18 @@ use crate::value::{
 };
 
 /// TODO: docs.
-pub trait Function<'args> {
+pub trait Function {
     /// TODO: docs.
     #[cfg(nightly)]
     const NAME: &'static str = any::type_name::<Self>();
 
     /// TODO: docs.
-    type Args: Args<'args>;
+    type Args: Args;
 
     /// TODO: docs.
-    fn call<'this, 'eval>(
+    fn call<'this, 'eval, 'args>(
         &'this mut self,
-        args: <Self::Args as Args<'args>>::Values,
+        args: <Self::Args as Args>::Values<'args>,
         ctx: &mut Context<'eval>,
     ) -> impl IntoResult<Output: IntoValue, Error: Into<Error>>
     + use<'this, 'args, 'eval, Self>;
@@ -46,7 +50,7 @@ pub trait Function<'args> {
     {
         struct Wrapper<T>(T);
 
-        impl<'a, T: Function<'a> + 'static> Value for Wrapper<T> {
+        impl<T: Function + 'static> Value for Wrapper<T> {
             #[inline]
             fn kind(&self) -> ValueKind {
                 ValueKind::Function
@@ -81,7 +85,32 @@ pub trait Function<'args> {
     where
         Self: Sized + 'static,
     {
-        unsafe extern "C" fn callback<'a, Fun: Function<'a> + 'static>(
+        fn try_call<'args, Fun: Function + 'static>(
+            fun: &mut Fun,
+            args_list: ArgsList<'args>,
+            ctx: &mut Context,
+            dest: UninitValue,
+        ) -> Result<()> {
+            let args =
+                <Fun::Args as Args>::values_from_args_list(args_list, ctx)?;
+
+            let mut value = fun
+                .call(args, ctx)
+                .into_result()
+                .map_err(Into::into)?
+                .into_value(ctx);
+
+            // As described in the [docs] of `nix_init_apply`, it's not
+            // possible to return thunks from primops, so let's force the
+            // value before writing it to the return location.
+            //
+            // [docs]: https://github.com/NixOS/nix/blob/af0ac14/src/libexpr-c/nix_api_value.h#L564
+            value.force_inline(ctx)?;
+
+            value.write(dest, ctx)
+        }
+
+        unsafe extern "C" fn callback<Fun: Function + 'static>(
             userdata: *mut c_void,
             ctx_raw: *mut nixb_sys::c_context,
             state_raw: *mut nixb_sys::EvalState,
@@ -122,28 +151,7 @@ pub trait Function<'args> {
             // uninitialized value.
             let dest = unsafe { UninitValue::new(dest_ptr) };
 
-            let mut try_block = || {
-                let args = <Fun as Function>::Args::values_from_args_list(
-                    args_list, &mut ctx,
-                )?;
-
-                let mut value = fun
-                    .call(args, &mut ctx)
-                    .into_result()
-                    .map_err(Into::into)?
-                    .into_value(&mut ctx);
-
-                // As described in the [docs] of `nix_init_apply`, it's not
-                // possible to return thunks from primops, so let's force the
-                // value before writing it to the return location.
-                //
-                // [docs]: https://github.com/NixOS/nix/blob/af0ac14/src/libexpr-c/nix_api_value.h#L564
-                value.force_inline(&mut ctx)?;
-
-                value.write(dest, &mut ctx)
-            };
-
-            if let Err(err) = try_block() {
+            if let Err(err) = try_call(fun, args_list, &mut ctx, dest) {
                 unsafe {
                     nixb_sys::set_err_msg(
                         ctx_raw,
@@ -154,7 +162,7 @@ pub trait Function<'args> {
             }
         }
 
-        callback::<'args, Self>
+        callback::<Self>
     }
 
     #[doc(hidden)]
@@ -243,78 +251,84 @@ pub trait Function<'args> {
 }
 
 /// TODO: docs.
-pub trait IntoFunction<'a, A: Args<'a>> {
+pub trait IntoFunction<'a, A: Args> {
     #[doc(hidden)]
     type Output: IntoValue + 'a;
 
     #[doc(hidden)]
     fn call(
         &mut self,
-        args: A::Values,
+        args: A::Values<'a>,
         ctx: &mut Context,
     ) -> Result<Self::Output>;
 }
 
 /// TODO: docs.
-pub trait Arg<'a> {
+pub trait Arg {
     /// TODO: docs.
     const NAME: &'static CStr;
 
     /// TODO: docs.
-    type Value: TryFromValue<NixValue<Borrowed<'a>>>;
+    type Value<'a>;
+
+    #[doc(hidden)]
+    fn value_from_arg<'a>(
+        value: NixValue<Borrowed<'a>>,
+        ctx: &mut Context,
+    ) -> Result<Self::Value<'a>>;
 }
 
 /// TODO: docs.
-pub trait Args<'a> {
+pub trait Args {
     /// A slice containing pointers to the names of the arguments, terminated
     /// by a trailing null pointer.
     #[doc(hidden)]
     const NAMES: &'static [*const c_char];
 
     /// TODO: docs.
-    type Values;
+    type Values<'a>;
 
     #[doc(hidden)]
-    fn values_from_args_list(
+    fn values_from_args_list<'a>(
         args_list: ArgsList<'a>,
         ctx: &mut Context,
-    ) -> Result<Self::Values>;
+    ) -> Result<Self::Values<'a>>;
 }
 
 /// TODO: docs.
 #[inline]
-pub fn function<'a, A>(
-    mut fun: impl IntoFunction<'a, A> + 'static,
-) -> impl Function<'a> + Value + 'static
+pub fn function<A>(
+    fun: impl for<'a> IntoFunction<'a, A> + 'static,
+) -> impl Function + Value + 'static
 where
-    A: Args<'a> + 'a,
+    A: Args,
 {
-    struct Wrapper<F> {
-        args_names: &'static [*const c_char],
+    struct Wrapper<A, F> {
         fun: F,
+        _args: PhantomData<fn() -> A>,
     }
 
-    impl<'a, F, T> Function<'a> for Wrapper<F>
+    impl<A, F> Function for Wrapper<A, F>
     where
-        F: FnMut(ArgsList<'a>, &mut Context) -> Result<T>,
-        T: IntoValue,
+        A: Args,
+        F: for<'a> IntoFunction<'a, A>,
     {
-        type Args = ArgsList<'a>;
+        type Args = A;
 
         #[inline]
-        fn call(&mut self, args: ArgsList<'a>, ctx: &mut Context) -> Result<T> {
-            (self.fun)(args, ctx)
-        }
-
-        #[inline]
-        fn args_names(&self) -> &'static [*const c_char] {
-            self.args_names
+        fn call<'this, 'eval, 'args>(
+            &'this mut self,
+            args: <A as Args>::Values<'args>,
+            ctx: &mut Context<'eval>,
+        ) -> impl IntoResult<Output: IntoValue, Error: Into<Error>>
+        + use<'this, 'eval, 'args, A, F> {
+            self.fun.call(args, ctx)
         }
     }
 
-    impl<'a, F> Value for Wrapper<F>
+    impl<A, F> Value for Wrapper<A, F>
     where
-        Self: Function<'a> + 'static,
+        Self: Function + 'static,
     {
         #[inline]
         fn kind(&self) -> ValueKind {
@@ -327,12 +341,7 @@ where
         }
     }
 
-    let wrapped_fun = move |args: ArgsList<'a>, ctx: &mut Context| {
-        let args = A::values_from_args_list(args, ctx)?;
-        fun.call(args, ctx)
-    };
-
-    Wrapper { args_names: A::NAMES, fun: wrapped_fun }
+    Wrapper { fun, _args: PhantomData }
 }
 
 /// TODO: docs.
@@ -365,75 +374,137 @@ impl<'a> ArgsList<'a> {
     }
 }
 
-impl<'a> Args<'a> for ArgsList<'a> {
-    // `function()` overrides `Function::args_names`, so this should never be
-    // read. If it is, the wrapper is wired up incorrectly.
+impl<'spec> Args for ArgsList<'spec> {
+    // `ArgsList` only models the raw callback arguments. If names are needed,
+    // the `Function` implementation must override `args_names`.
     const NAMES: &'static [*const c_char] = unreachable!();
 
-    type Values = Self;
+    type Values<'a> = ArgsList<'a>;
 
     #[inline]
-    fn values_from_args_list(
-        args_list: Self,
+    fn values_from_args_list<'a>(
+        args_list: ArgsList<'a>,
         _: &mut Context,
-    ) -> Result<Self::Values> {
+    ) -> Result<Self::Values<'a>> {
         Ok(args_list)
     }
 }
 
-impl<T: IntoValue + Clone> Function<'_> for T {
+impl<T: IntoValue + Clone> Function for T {
     type Args = NoArgs;
 
     #[inline]
-    fn call<'eval>(
-        &mut self,
+    fn call<'this, 'eval, 'args>(
+        &'this mut self,
         _: (),
         ctx: &mut Context<'eval>,
-    ) -> impl Value + use<'eval, T> {
+    ) -> impl Value + use<'this, 'args, 'eval, T> {
         self.clone().into_value(ctx)
     }
 }
 
-impl<'a, T> Arg<'a> for T
-where
-    T: TryFromValue<NixValue<Borrowed<'a>>>,
-{
-    const NAME: &'static CStr = c"arg";
-    type Value = Self;
+mod private {
+    use super::*;
+
+    pub trait StaticArg: Sized {
+        fn value_from_arg<'a>(
+            value: NixValue<Borrowed<'a>>,
+            ctx: &mut Context,
+        ) -> Result<Self>;
+    }
+
+    impl<T> StaticArg for T
+    where
+        T: 'static,
+        for<'a> T: TryFromValue<NixValue<Borrowed<'a>>>,
+    {
+        #[inline]
+        fn value_from_arg<'a>(
+            value: NixValue<Borrowed<'a>>,
+            ctx: &mut Context,
+        ) -> Result<Self> {
+            T::try_from_value(value, ctx)
+        }
+    }
 }
 
-impl<'a, A: Arg<'a>> Args<'a> for A {
-    type Values = A::Value;
+impl<T: private::StaticArg> Arg for T
+where
+    T: 'static,
+{
+    const NAME: &'static CStr = c"arg";
+    type Value<'a> = Self;
+
+    #[inline]
+    fn value_from_arg<'a>(
+        value: NixValue<Borrowed<'a>>,
+        ctx: &mut Context,
+    ) -> Result<Self::Value<'a>> {
+        <Self as private::StaticArg>::value_from_arg(value, ctx)
+    }
+}
+
+macro_rules! impl_borrowed_arg {
+    ($($T:ident),+ $(,)?) => {
+        $(
+            impl<'spec> Arg for $T<Borrowed<'spec>> {
+                const NAME: &'static CStr = c"arg";
+                type Value<'a> = $T<Borrowed<'a>>;
+
+                #[inline]
+                fn value_from_arg<'a>(
+                    value: NixValue<Borrowed<'a>>,
+                    ctx: &mut Context,
+                ) -> Result<Self::Value<'a>> {
+                    <$T<Borrowed<'a>>>::try_from_value(value, ctx)
+                }
+            }
+        )+
+    };
+}
+
+impl_borrowed_arg!(
+    NixAttrset,
+    NixDerivation,
+    NixFunctor,
+    NixLambda,
+    NixList,
+    NixThunk,
+    NixValue,
+);
+
+impl<A: Arg> Args for A {
+    type Values<'a> = A::Value<'a>;
 
     const NAMES: &'static [*const c_char] = &[Self::NAME.as_ptr(), ptr::null()];
 
     #[inline]
-    fn values_from_args_list(
+    fn values_from_args_list<'a>(
         args_list: ArgsList<'a>,
         ctx: &mut Context,
-    ) -> Result<Self::Values> {
-        A::Value::try_from_value(unsafe { args_list.get(0) }, ctx)
+    ) -> Result<Self::Values<'a>> {
+        A::value_from_arg(unsafe { args_list.get(0) }, ctx)
     }
 }
 
-impl Args<'_> for NoArgs {
-    type Values = ();
+impl Args for NoArgs {
+    type Values<'a> = ();
 
     const NAMES: &'static [*const c_char] = &[ptr::null()];
 
     #[inline]
-    fn values_from_args_list(
-        _: ArgsList<'_>,
+    fn values_from_args_list<'a>(
+        _: ArgsList<'a>,
         _: &mut Context,
-    ) -> Result<Self::Values> {
+    ) -> Result<Self::Values<'a>> {
         Ok(())
     }
 }
 
 impl<'a, A, F, Res> IntoFunction<'a, A> for F
 where
-    A: Arg<'a> + 'a,
-    F: FnMut(A::Value) -> Res + 'static,
+    A: Arg,
+    F: FnMut(A::Value<'a>) -> Res + 'static,
     Res: IntoResult,
     Res::Output: IntoValue + 'a,
     Res::Error: Into<Error>,
@@ -443,7 +514,7 @@ where
     #[inline]
     fn call(
         &mut self,
-        args: A::Value,
+        args: A::Value<'a>,
         _ctx: &mut Context,
     ) -> Result<Self::Output> {
         (self)(args).into_result().map_err(Into::into)
@@ -454,8 +525,8 @@ macro_rules! impl_into_function_for_tuple {
     ($(($T:ident $arg:ident)),+) => {
         impl<'a, $($T,)+ F, Res> IntoFunction<'a, ($($T,)+)> for F
         where
-            $($T: Arg<'a> + 'a,)+
-            F: FnMut($($T::Value),+) -> Res + 'static,
+            $($T: Arg,)+
+            F: FnMut($($T::Value<'a>),+) -> Res + 'static,
             Res: IntoResult,
             Res::Output: IntoValue + 'a,
             Res::Error: Into<Error>,
@@ -465,7 +536,7 @@ macro_rules! impl_into_function_for_tuple {
             #[inline]
             fn call(
                 &mut self,
-                args: ($($T::Value,)+),
+                args: ($($T::Value<'a>,)+),
                 _ctx: &mut Context,
             ) -> Result<Self::Output> {
                 let ($($arg,)+) = args;
@@ -489,8 +560,8 @@ macro_rules! impl_args_for_tuple {
     };
 
     (@final [$(($idx:tt $T:ident))+]) => {
-        impl<'a, $($T: Arg<'a>),+> Args<'a> for ($($T,)+) {
-            type Values = ($($T::Value,)+);
+        impl<$($T: Arg),+> Args for ($($T,)+) {
+            type Values<'a> = ($($T::Value<'a>,)+);
 
             const NAMES: &'static [*const c_char] = &[
                 $($T::NAME.as_ptr(),)+
@@ -498,12 +569,12 @@ macro_rules! impl_args_for_tuple {
             ];
 
             #[inline]
-            fn values_from_args_list(
+            fn values_from_args_list<'a>(
                 args_list: ArgsList<'a>,
                 ctx: &mut Context,
-            ) -> Result<Self::Values> {
+            ) -> Result<Self::Values<'a>> {
                 Ok((
-                    $($T::Value::try_from_value(unsafe { args_list.get($idx) }, ctx)?,)+
+                    $($T::value_from_arg(unsafe { args_list.get($idx) }, ctx)?,)+
                 ))
             }
         }
