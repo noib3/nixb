@@ -289,24 +289,6 @@ pub fn function<'a, A>(
 where
     A: Args<'a> + 'a,
 {
-    struct PassthroughArgs;
-
-    impl<'a> Args<'a> for PassthroughArgs {
-        /// [`Wrapper`] overrides [`Function::args_names`], so this is never
-        /// used.
-        const NAMES: &'static [*const c_char] = unreachable!();
-
-        type Values = ArgsList<'a>;
-
-        #[inline]
-        fn values_from_args_list(
-            args_list: ArgsList<'a>,
-            _: &mut Context,
-        ) -> Result<Self::Values> {
-            Ok(args_list)
-        }
-    }
-
     struct Wrapper<F> {
         args_names: &'static [*const c_char],
         fun: F,
@@ -317,7 +299,7 @@ where
         F: FnMut(ArgsList<'a>, &mut Context) -> Result<T>,
         T: IntoValue,
     {
-        type Args = PassthroughArgs;
+        type Args = ArgsList<'a>;
 
         #[inline]
         fn call(&mut self, args: ArgsList<'a>, ctx: &mut Context) -> Result<T> {
@@ -383,6 +365,22 @@ impl<'a> ArgsList<'a> {
     }
 }
 
+impl<'a> Args<'a> for ArgsList<'a> {
+    // `function()` overrides `Function::args_names`, so this placeholder is
+    // never used to describe the callable's public arity.
+    const NAMES: &'static [*const c_char] = &[ptr::null()];
+
+    type Values = Self;
+
+    #[inline]
+    fn values_from_args_list(
+        args_list: Self,
+        _: &mut Context,
+    ) -> Result<Self::Values> {
+        Ok(args_list)
+    }
+}
+
 impl<T: IntoValue + Clone> Function<'_> for T {
     type Args = NoArgs;
 
@@ -435,7 +433,7 @@ impl Args<'_> for NoArgs {
 impl<'a, A, F, Res> IntoFunction<'a, A> for F
 where
     A: Args<'a> + 'a,
-    F: FnMut(A::Values, &mut Context) -> Res + 'static,
+    F: FnMut(A::Values) -> Res + 'static,
     Res: IntoResult,
     Res::Output: IntoValue + 'a,
     Res::Error: Into<Error>,
@@ -446,9 +444,9 @@ where
     fn call(
         &mut self,
         args: A::Values,
-        ctx: &mut Context,
+        _ctx: &mut Context,
     ) -> Result<Self::Output> {
-        (self)(args, ctx).into_result().map_err(Into::into)
+        (self)(args).into_result().map_err(Into::into)
     }
 }
 
