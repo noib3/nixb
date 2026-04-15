@@ -9,7 +9,7 @@ use core::cell::OnceCell;
 use core::ffi::{CStr, c_uint};
 use core::marker::PhantomData;
 use core::ops::Deref;
-use core::ptr::{self, NonNull};
+use core::ptr::NonNull;
 use core::result::Result as CoreResult;
 use core::{fmt, mem};
 
@@ -34,7 +34,7 @@ use crate::value::{
     ValueOwner,
     Values,
 };
-use crate::{IntoResult, Utf8CStr};
+use crate::{ExprContext, IntoResult, Utf8CStr};
 
 /// TODO: docs.
 pub trait Attrset {
@@ -215,13 +215,13 @@ pub trait FnOnceKeyValueIter<Ctx, Out> {
 /// TODO: docs.
 #[derive(Copy, Clone)]
 pub struct NixAttrset<Owner = Owned> {
-    inner: NixValue<Owner>,
+    pub(crate) inner: NixValue<Owner>,
 }
 
 /// TODO: docs.
 #[derive(Copy, Clone)]
 pub struct NixDerivation<Owner = Owned> {
-    inner: NixAttrset<Owner>,
+    pub(crate) inner: NixAttrset<Owner>,
 }
 
 /// The attribute set type produced by the [`attrset!`] macro.
@@ -380,19 +380,14 @@ impl<Owner: ValueOwner> NixAttrset<Owner> {
 
     /// Returns whether this attribute set is empty.
     #[inline]
-    pub fn is_empty(&self) -> bool {
-        self.len() == 0
+    pub fn is_empty(&self, ctx: &mut impl ExprContext) -> bool {
+        self.len(ctx) == 0
     }
 
     /// Returns the number of attributes in this attribute set.
     #[inline]
-    pub fn len(&self) -> c_uint {
-        // 'nix_get_attrs_size' errors when the value pointer is null or when
-        // the value is not initizialized, but having a NixValue guarantees
-        // neither of those can happen, so we can use a null context.
-        unsafe {
-            nixb_sys::get_attrs_size(ptr::null_mut(), self.inner.as_ptr())
-        }
+    pub fn len(&self, ctx: &mut impl ExprContext) -> c_uint {
+        ctx.get_attrs_size(self)
     }
 
     #[inline]
@@ -472,19 +467,9 @@ impl<Owner: ValueOwner> NixAttrset<Owner> {
     fn get_value<'this>(
         &'this self,
         key: &CStr,
-        ctx: &mut Context,
+        ctx: &mut impl ExprContext,
     ) -> Option<NixValue<Owner::Borrow<'this>>> {
-        let value_raw = unsafe {
-            nixb_cpp::get_attr_byname_lazy_no_incref(
-                self.inner.as_ptr(),
-                ctx.state_ptr(),
-                key.as_ptr(),
-            )
-        };
-
-        NonNull::new(value_raw)
-            .map(|ptr| unsafe { Owner::Borrow::new(ptr) })
-            .map(NixValue::new)
+        ctx.get_attr_byname_lazy(self, key)
     }
 }
 
@@ -532,30 +517,9 @@ impl<Owner: ValueOwner> NixDerivation<Owner> {
     }
 
     /// TODO: docs.
-    #[inline]
-    pub fn realise(&self, ctx: &mut Context) -> Result<()> {
-        let expr = c"drv: \"${drv}\"";
-        let string_drv =
-            ctx.eval::<NixLambda>(expr)?.call(self.inner.borrow(), ctx)?;
-        let value = string_drv.into_inner();
-        let realised_str = ctx.with_raw_and_state(|ctx, state| unsafe {
-            #[cfg(not(feature = "nix-2-34"))]
-            {
-                nixb_cpp::string_realise(
-                    ctx,
-                    state.as_ptr(),
-                    value.as_ptr(),
-                    true,
-                )
-            }
-
-            #[cfg(feature = "nix-2-34")]
-            nixb_sys::string_realise(ctx, state.as_ptr(), value.as_ptr(), true)
-        })?;
-        unsafe {
-            nixb_sys::realised_string_free(realised_str);
-        }
-        Ok(())
+    #[inline(always)]
+    pub fn realise(&self, ctx: &mut impl ExprContext) -> Result<()> {
+        ctx.realise_derivation(self)
     }
 }
 
@@ -582,7 +546,7 @@ impl<Owner: ValueOwner> NixAttrsetIterator<Owner> {
         let iterator =
             NonNull::new(iter_raw).expect("failed to create attr iterator");
 
-        Self { iterator, len: set.len(), _attrset: PhantomData }
+        Self { iterator, len: set.len(ctx), _attrset: PhantomData }
     }
 }
 

@@ -11,6 +11,7 @@ pub mod attrset;
 pub mod builtins;
 pub mod callable;
 pub mod context;
+mod context2;
 pub mod error;
 pub mod function;
 mod into_result;
@@ -21,6 +22,7 @@ pub mod tuple;
 mod utf8_cstr;
 pub mod value;
 
+pub use context2::ExprContext;
 pub use into_result::IntoResult;
 pub use nixb_macros::{Attrset, TryFromValue, Value};
 pub use utf8_cstr::Utf8CStr;
