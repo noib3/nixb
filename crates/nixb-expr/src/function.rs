@@ -366,9 +366,9 @@ impl<'a> ArgsList<'a> {
 }
 
 impl<'a> Args<'a> for ArgsList<'a> {
-    // `function()` overrides `Function::args_names`, so this placeholder is
-    // never used to describe the callable's public arity.
-    const NAMES: &'static [*const c_char] = &[ptr::null()];
+    // `function()` overrides `Function::args_names`, so this should never be
+    // read. If it is, the wrapper is wired up incorrectly.
+    const NAMES: &'static [*const c_char] = unreachable!();
 
     type Values = Self;
 
@@ -432,8 +432,8 @@ impl Args<'_> for NoArgs {
 
 impl<'a, A, F, Res> IntoFunction<'a, A> for F
 where
-    A: Args<'a> + 'a,
-    F: FnMut(A::Values) -> Res + 'static,
+    A: Arg<'a> + 'a,
+    F: FnMut(A::Value) -> Res + 'static,
     Res: IntoResult,
     Res::Output: IntoValue + 'a,
     Res::Error: Into<Error>,
@@ -443,11 +443,36 @@ where
     #[inline]
     fn call(
         &mut self,
-        args: A::Values,
+        args: A::Value,
         _ctx: &mut Context,
     ) -> Result<Self::Output> {
         (self)(args).into_result().map_err(Into::into)
     }
+}
+
+macro_rules! impl_into_function_for_tuple {
+    ($(($T:ident $arg:ident)),+) => {
+        impl<'a, $($T,)+ F, Res> IntoFunction<'a, ($($T,)+)> for F
+        where
+            $($T: Arg<'a> + 'a,)+
+            F: FnMut($($T::Value),+) -> Res + 'static,
+            Res: IntoResult,
+            Res::Output: IntoValue + 'a,
+            Res::Error: Into<Error>,
+        {
+            type Output = Res::Output;
+
+            #[inline]
+            fn call(
+                &mut self,
+                args: ($($T::Value,)+),
+                _ctx: &mut Context,
+            ) -> Result<Self::Output> {
+                let ($($arg,)+) = args;
+                (self)($($arg),+).into_result().map_err(Into::into)
+            }
+        }
+    };
 }
 
 macro_rules! impl_args_for_tuple {
@@ -501,3 +526,11 @@ impl_args_for_tuple!(A1, A2, A3, A4, A5);
 impl_args_for_tuple!(A1, A2, A3, A4, A5, A6);
 impl_args_for_tuple!(A1, A2, A3, A4, A5, A6, A7);
 impl_args_for_tuple!(A1, A2, A3, A4, A5, A6, A7, A8);
+
+impl_into_function_for_tuple!((A1 a1), (A2 a2));
+impl_into_function_for_tuple!((A1 a1), (A2 a2), (A3 a3));
+impl_into_function_for_tuple!((A1 a1), (A2 a2), (A3 a3), (A4 a4));
+impl_into_function_for_tuple!((A1 a1), (A2 a2), (A3 a3), (A4 a4), (A5 a5));
+impl_into_function_for_tuple!((A1 a1), (A2 a2), (A3 a3), (A4 a4), (A5 a5), (A6 a6));
+impl_into_function_for_tuple!((A1 a1), (A2 a2), (A3 a3), (A4 a4), (A5 a5), (A6 a6), (A7 a7));
+impl_into_function_for_tuple!((A1 a1), (A2 a2), (A3 a3), (A4 a4), (A5 a5), (A6 a6), (A7 a7), (A8 a8));
