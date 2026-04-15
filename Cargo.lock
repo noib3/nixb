@@ -160,6 +160,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "nixb-context"
+version = "0.1.0"
+dependencies = [
+ "nixb-result",
+ "nixb-sys",
+]
+
+[[package]]
 name = "nixb-cpp"
 version = "0.1.0"
 dependencies = [
