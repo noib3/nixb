@@ -28,6 +28,7 @@ nixb = { path = "./crates/nixb", default-features = false }
 nixb-cpp = { path = "./crates/nixb-cpp" }
 nixb-expr = { path = "./crates/nixb-expr" }
 nixb-macros = { path = "./crates/nixb-macros" }
+nixb-plugin = { path = "./crates/nixb-plugin" }
 nixb-sys = { path = "./crates/nixb-sys" }
 
 [workspace.lints.clippy]

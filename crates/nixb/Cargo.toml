@@ -18,11 +18,8 @@ smallvec = ["nixb-expr?/smallvec"]
 std = ["nixb-expr?/std"]
 
 [dependencies]
-libc = { workspace = true, optional = true }
-libloading = { workspace = true, optional = true }
-memchr = { workspace = true, optional = true }
 nixb-expr = { workspace = true, optional = true }
-rusqlite = { workspace = true, optional = true }
+nixb-plugin = { workspace = true, optional = true }
 
 [lints]
 workspace = true

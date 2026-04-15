@@ -22,7 +22,5 @@ mod utf8_cstr;
 pub mod value;
 
 pub use into_result::IntoResult;
-pub use nixb_macros::{Attrset, PrimOp, TryFromValue, Value, plugin};
-#[doc(hidden)]
-pub use nixb_sys as sys;
+pub use nixb_macros::{Attrset, TryFromValue, Value};
 pub use utf8_cstr::Utf8CStr;
