@@ -1,8 +1,10 @@
 //! TODO: docs.
 
 #[cfg(feature = "expr")]
+#[doc(inline)]
 pub use nixb_expr as expr;
 #[cfg(feature = "plugin")]
+#[doc(inline)]
 pub use nixb_plugin as plugin;
 
 pub mod prelude {

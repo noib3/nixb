@@ -1,5 +1,5 @@
-#![allow(missing_docs)]
-#![allow(rustdoc::broken_intra_doc_links)]
+//! TODO: docs.
+
 #![no_std]
 
 mod bindings;
