@@ -7,13 +7,14 @@ authors.workspace = true
 license.workspace = true
 
 [features]
-default = ["nix-2-34"]
+default = ["dlopen", "nix-2-34"]
+dlopen = ["nixb/dlopen"]
 nix-2-32 = ["nixb/nix-2-32"]
 nix-2-33 = ["nixb/nix-2-33"]
 nix-2-34 = ["nixb/nix-2-34"]
 
 [dependencies]
-nixb = { workspace = true, features = ["dlopen", "expr", "plugin"] }
+nixb = { workspace = true, features = ["expr", "plugin"] }
 
 [[example]]
 name = "hello_world"
