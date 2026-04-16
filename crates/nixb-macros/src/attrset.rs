@@ -96,6 +96,7 @@ pub(crate) fn expand(input: TokenStream) -> syn::Result<TokenStream> {
     }
 }
 
+#[derive(Default)]
 struct Attrset {
     /// The parsed key-value pairs, sorted lexicographically by key.
     /// [`Expr`](Key::Expr)ession keys are not sorted since they can't be
@@ -116,14 +117,102 @@ struct KeyValuePair {
 }
 
 enum Key {
-    Literal(CString),
+    Literal(CString, Span),
     Expr(syn::Expr),
+}
+
+impl Attrset {
+    fn insert_pair(&mut self, mut pair: KeyValuePair) -> syn::Result<()> {
+        if matches!(pair.key, Key::Expr(_)) {
+            self.pairs.insert(self.num_expr_keys, pair);
+            self.num_expr_keys += 1;
+        } else {
+            let idx = self.literal_pair_insertion_idx(&mut pair)?;
+            self.pairs.insert(idx, pair);
+        }
+
+        Ok(())
+    }
+
+    /// Returns the index at which the given literal pair should be inserted, or
+    /// an error if the attrset already contains a non-`cfg`-gated pair with the
+    /// same key.
+    fn literal_pair_insertion_idx(
+        &mut self,
+        pair: &mut KeyValuePair,
+    ) -> syn::Result<usize> {
+        let Key::Literal(key, _) = &pair.key else {
+            unreachable!("pair's key must be a literal")
+        };
+
+        let start_idx =
+            self.pairs[self.num_expr_keys..].partition_point(|existing| {
+                let Key::Literal(existing_key, _) = &existing.key else {
+                    unreachable!("literal keys are stored after expr keys");
+                };
+                existing_key < key
+            }) + self.num_expr_keys;
+
+        let num_pairs_with_same_key = self.pairs[start_idx..]
+            .iter()
+            .take_while(|existing| {
+                let Key::Literal(existing_key, _) = &existing.key else {
+                    unreachable!("literal keys are stored after expr keys");
+                };
+                existing_key == key
+            })
+            .count();
+
+        let insertion_index = start_idx + num_pairs_with_same_key;
+
+        if num_pairs_with_same_key != 0 {
+            let is_cfg_gated = pair.is_cfg_gated();
+
+            let any_existing_is_not_cfg_gated = self.pairs
+                [start_idx..insertion_index]
+                .iter_mut()
+                .any(|pair| !pair.is_cfg_gated());
+
+            // Only emit an error if either the new pair or any of the existing
+            // pairs with the same key is not `cfg`-gated. Otherwise allow the
+            // duplicate since the gates might be mutually exclusive.
+            if !is_cfg_gated || any_existing_is_not_cfg_gated {
+                let Key::Literal(key, span) = &pair.key else { unreachable!() };
+
+                return Err(syn::Error::new(
+                    *span,
+                    format_args!(
+                        "duplicate attrset key `{}`",
+                        key.as_c_str().to_string_lossy()
+                    ),
+                ));
+            }
+        }
+
+        Ok(insertion_index)
+    }
+}
+
+impl KeyValuePair {
+    fn is_cfg_gated(&mut self) -> bool {
+        if let Some(is_cfg_gated) = self.is_cfg_gated {
+            return is_cfg_gated;
+        }
+
+        let is_cfg_gated = self.attrs.iter().any(|attr| {
+            attr.path().is_ident("cfg") || attr.path().is_ident("cfg_attr")
+        });
+
+        self.is_cfg_gated = Some(is_cfg_gated);
+
+        is_cfg_gated
+    }
 }
 
 impl Parse for Attrset {
     fn parse(input: ParseStream) -> syn::Result<Self> {
-        let mut pairs = Vec::new();
-        let mut num_expr_keys = 0;
+        let mut this = Self::default();
+        let mut errors: Option<syn::Error> = None;
 
         while !input.is_empty() {
             // Parse attributes (e.g., #[cfg(...)]).
@@ -161,19 +250,20 @@ impl Parse for Attrset {
             let is_cfg_gated =
                 if attrs.is_empty() { Some(false) } else { None };
 
-            let pair =
-                KeyValuePair { attrs, is_cfg_gated, is_optional, key, value };
+            let insert_res = this.insert_pair(KeyValuePair {
+                attrs,
+                is_cfg_gated,
+                is_optional,
+                key,
+                value,
+            });
 
-            if matches!(pair.key, Key::Expr(_)) {
-                pairs.insert(num_expr_keys, pair);
-                num_expr_keys += 1;
-            } else {
-                // a) get insertion index by binary searching the vec.
-                // b) if there's a duplicate, resolve both this keypair and the
-                // existing keypair's `is_cfg_gated`. If both of them are true
-                // we allow it (Q: how do we break Ordering ties in that case?).
-                // c) otherwise, combine the error with this key's span.
-                todo!();
+            if let Err(err) = insert_res {
+                if let Some(existing_errors) = errors.as_mut() {
+                    existing_errors.combine(err);
+                } else {
+                    errors = Some(err);
+                }
             }
 
             // Parse optional comma.
@@ -182,48 +272,9 @@ impl Parse for Attrset {
             }
         }
 
-        Ok(Self { pairs, num_expr_keys })
+        if let Some(errors) = errors { Err(errors) } else { Ok(this) }
     }
 }
-
-// fn validate_no_duplicate_keys(pairs: &[KeyValuePair]) -> syn::Result<()> {
-//     let mut first_occurrences = HashMap::new();
-//     let mut errors: Option<syn::Error> = None;
-//
-//     for pair in pairs {
-//         let Key::Literal(key) = &pair.key else {
-//             continue;
-//         };
-//
-//         // Pairs annotated with `#[cfg]` and `#[cfg_attr]` can be omitted when
-//         // the gate is not active, so skip duplicate detection for those cases.
-//         if pair.attrs.iter().any(|attr| {
-//             attr.path().is_ident("cfg") || attr.path().is_ident("cfg_attr")
-//         }) {
-//             continue;
-//         }
-//
-//         match first_occurrences.entry(key.name.clone()) {
-//             Entry::Vacant(entry) => {
-//                 entry.insert(key.span);
-//             },
-//             Entry::Occupied(_) => {
-//                 let error = syn::Error::new(
-//                     key.span,
-//                     format_args!("duplicate attrset key `{}`", key.name),
-//                 );
-//
-//                 if let Some(existing_errors) = &mut errors {
-//                     existing_errors.combine(error);
-//                 } else {
-//                     errors = Some(error);
-//                 }
-//             },
-//         }
-//     }
-//
-//     errors.map_or(Ok(()), Err)
-// }
 
 impl Parse for Key {
     #[inline]
@@ -246,7 +297,7 @@ impl Parse for Key {
                     "attrset key cannot contain NUL byte",
                 )
             })?;
-            Ok(Self::Literal(c_string))
+            Ok(Self::Literal(c_string, ident.span()))
         }
     }
 }
@@ -255,7 +306,7 @@ impl ToTokens for Key {
     #[inline]
     fn to_tokens(&self, tokens: &mut TokenStream) {
         match self {
-            Self::Literal(c_string) => {
+            Self::Literal(c_string, _) => {
                 let literal = Literal::c_string(c_string);
                 tokens.extend(quote! {
                     // SAFETY: valid UTF-8.
@@ -292,14 +343,32 @@ mod tests {
     }
 
     #[test]
-    fn skips_duplicate_detection_for_cfg_guarded_keys() {
+    fn allows_duplicate_cfg_guarded_keys() {
         assert!(
             expand(quote! {
                 #[cfg(feature = "foo")]
                 value1: "Hello",
+                #[cfg(feature = "bar")]
                 value1: "World",
             })
             .is_ok()
+        );
+    }
+
+    #[test]
+    fn rejects_mixed_cfg_guarded_and_unguarded_duplicates() {
+        let error = expand(quote! {
+            #[cfg(feature = "foo")]
+            value1: "Hello",
+            value1: "World",
+        })
+        .unwrap_err();
+
+        let compile_error = error.into_compile_error().to_string();
+
+        assert_eq!(
+            compile_error.matches("duplicate attrset key `value1`").count(),
+            1
         );
     }
 }
