@@ -7,7 +7,7 @@ use nixb_contexts::c_context::CContext;
 
 /// TODO: docs.
 pub struct CStoreContext {
-    ctx: CContext,
+    inner: CContext,
     store: *mut nixb_sys::Store,
 }
 
@@ -41,7 +41,7 @@ impl CStoreContext {
         _fun: (),
         _opts: (),
     ) -> nixb_result::Result<()> {
-        self.ctx.with_ptr(|ctx| unsafe {
+        self.inner.with_ptr(|ctx| unsafe {
             nixb_sys::store_get_fs_closure(
                 ctx,
                 self.store,
@@ -66,7 +66,7 @@ impl CStoreContext {
         let store = ctx.with_ptr(|ctx| unsafe {
             nixb_sys::store_open(ctx, uri.as_ref().as_ptr(), ptr::null_mut())
         })?;
-        Ok(Self { ctx, store })
+        Ok(Self { inner: ctx, store })
     }
 }
 
