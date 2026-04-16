@@ -13,18 +13,9 @@ use crate::list::Value;
 #[expect(clippy::too_many_lines)]
 #[inline]
 pub(crate) fn expand(input: TokenStream) -> syn::Result<TokenStream> {
-    let Attrset { all_keys_are_literals, mut pairs } = syn::parse2(input)?;
+    let Attrset { pairs, num_expr_keys } = syn::parse2(input)?;
 
-    // Sort the pairs by lexicographic order if the keys are all literals.
-    if all_keys_are_literals {
-        pairs.sort_by(|x, y| {
-            let (Key::Literal(x_key), Key::Literal(y_key)) = (&x.key, &y.key)
-            else {
-                unreachable!("all keys are literals");
-            };
-            x_key.name.cmp(&y_key.name)
-        });
-    }
+    let all_keys_are_literals = num_expr_keys == 0;
 
     let mut keys = TokenStream::new();
     let mut values = TokenStream::new();
@@ -108,27 +99,39 @@ pub(crate) fn expand(input: TokenStream) -> syn::Result<TokenStream> {
 }
 
 struct Attrset {
-    all_keys_are_literals: bool,
+    /// The parsed key-value pairs, sorted lexicographically by key.
+    /// [`Expr`](Key::Expr)ession keys are not sorted since they can't be
+    /// compared at compile time, and they're all stored at the start of the
+    /// list.
     pairs: Vec<KeyValuePair>,
+
+    /// The number of [`Expr`](Key::Expr)ession keys in `pairs`.
+    num_expr_keys: usize,
 }
 
 struct KeyValuePair {
     attrs: Vec<Attribute>,
+    is_cfg_gated: Option<bool>,
     is_optional: bool,
     key: Key,
     value: Value,
 }
 
 enum Key {
-    Literal(LiteralKey),
+    Literal(CString),
     Expr(syn::Expr),
+}
+
+struct LiteralKey {
+    name: String,
+    c_string: CString,
+    span: Span,
 }
 
 impl Parse for Attrset {
     fn parse(input: ParseStream) -> syn::Result<Self> {
         let mut pairs = Vec::new();
-
-        let mut all_keys_are_literals = true;
+        let mut num_expr_keys = 0;
 
         while !input.is_empty() {
             // Parse attributes (e.g., #[cfg(...)]).
@@ -143,8 +146,6 @@ impl Parse for Attrset {
 
             // Parse key.
             let key = input.parse()?;
-
-            all_keys_are_literals &= matches!(key, Key::Literal(_));
 
             // Parse optional `?` to mark this key as optional.
             let is_optional = input.peek(Token![?]);
@@ -165,7 +166,23 @@ impl Parse for Attrset {
                 ));
             };
 
-            pairs.push(KeyValuePair { attrs, is_optional, key, value });
+            let is_cfg_gated =
+                if attrs.is_empty() { Some(false) } else { None };
+
+            let pair =
+                KeyValuePair { attrs, is_cfg_gated, is_optional, key, value };
+
+            if matches!(pair.key, Key::Expr(_)) {
+                pairs.insert(num_expr_keys, pair);
+                num_expr_keys += 1;
+            } else {
+                // a) get insertion index by binary searching the vec.
+                // b) if there's a duplicate, resolve both this keypair and the
+                // existing keypair's `is_cfg_gated`. If both of them are true
+                // we allow it (Q: how do we break Ordering ties in that case?).
+                // c) otherwise, combine the error with this key's span.
+                todo!();
+            }
 
             // Parse optional comma.
             if input.peek(Token![,]) {
@@ -173,54 +190,48 @@ impl Parse for Attrset {
             }
         }
 
-        validate_no_duplicate_keys(&pairs)?;
-
-        Ok(Self { all_keys_are_literals, pairs })
+        Ok(Self { pairs, num_expr_keys })
     }
 }
 
-fn validate_no_duplicate_keys(pairs: &[KeyValuePair]) -> syn::Result<()> {
-    let mut first_occurrences = HashMap::new();
-    let mut errors: Option<syn::Error> = None;
-
-    for pair in pairs {
-        let Key::Literal(key) = &pair.key else {
-            continue;
-        };
-
-        // `#[cfg]` and `#[cfg_attr]` can remove an entry entirely, so skip
-        // static duplicate detection for those cases.
-        if pair.attrs.iter().any(|attr| {
-            attr.path().is_ident("cfg") || attr.path().is_ident("cfg_attr")
-        }) {
-            continue;
-        }
-
-        match first_occurrences.entry(key.name.clone()) {
-            Entry::Vacant(entry) => {
-                entry.insert(key.span);
-            },
-            Entry::Occupied(_) => {
-                let error = syn::Error::new(
-                    key.span,
-                    format!(
-                        "duplicate attrset key `{}`; the first definition is \
-                         earlier in this attrset",
-                        key.name,
-                    ),
-                );
-
-                if let Some(existing_errors) = &mut errors {
-                    existing_errors.combine(error);
-                } else {
-                    errors = Some(error);
-                }
-            },
-        }
-    }
-
-    errors.map_or(Ok(()), Err)
-}
+// fn validate_no_duplicate_keys(pairs: &[KeyValuePair]) -> syn::Result<()> {
+//     let mut first_occurrences = HashMap::new();
+//     let mut errors: Option<syn::Error> = None;
+//
+//     for pair in pairs {
+//         let Key::Literal(key) = &pair.key else {
+//             continue;
+//         };
+//
+//         // Pairs annotated with `#[cfg]` and `#[cfg_attr]` can be omitted when
+//         // the gate is not active, so skip duplicate detection for those cases.
+//         if pair.attrs.iter().any(|attr| {
+//             attr.path().is_ident("cfg") || attr.path().is_ident("cfg_attr")
+//         }) {
+//             continue;
+//         }
+//
+//         match first_occurrences.entry(key.name.clone()) {
+//             Entry::Vacant(entry) => {
+//                 entry.insert(key.span);
+//             },
+//             Entry::Occupied(_) => {
+//                 let error = syn::Error::new(
+//                     key.span,
+//                     format_args!("duplicate attrset key `{}`", key.name),
+//                 );
+//
+//                 if let Some(existing_errors) = &mut errors {
+//                     existing_errors.combine(error);
+//                 } else {
+//                     errors = Some(error);
+//                 }
+//             },
+//         }
+//     }
+//
+//     errors.map_or(Ok(()), Err)
+// }
 
 impl Parse for Key {
     #[inline]
@@ -236,14 +247,14 @@ impl Parse for Key {
         // c-string literal.
         else {
             let ident = input.call(syn::Ident::parse_any)?;
-            let name = ident.to_string();
-            let c_string = CString::new(name.clone()).map_err(|_| {
+            let ident_str = ident.to_string();
+            let c_string = CString::new(ident_str).map_err(|_| {
                 syn::Error::new(
                     ident.span(),
                     "attrset key cannot contain NUL byte",
                 )
             })?;
-            Ok(Self::Literal(LiteralKey { name, c_string, span: ident.span() }))
+            Ok(Self::Literal(c_string))
         }
     }
 }
@@ -252,8 +263,8 @@ impl ToTokens for Key {
     #[inline]
     fn to_tokens(&self, tokens: &mut TokenStream) {
         match self {
-            Self::Literal(key) => {
-                let literal = Literal::c_string(&key.c_string);
+            Self::Literal(c_string) => {
+                let literal = Literal::c_string(c_string);
                 tokens.extend(quote! {
                     // SAFETY: valid UTF-8.
                     unsafe { ::nixb::expr::Utf8CStr::new_unchecked(#literal) }
@@ -262,12 +273,6 @@ impl ToTokens for Key {
             Self::Expr(expr) => tokens.extend(quote! { { #expr } }),
         }
     }
-}
-
-struct LiteralKey {
-    name: String,
-    c_string: CString,
-    span: Span,
 }
 
 #[cfg(test)]
