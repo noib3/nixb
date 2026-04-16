@@ -1,6 +1,8 @@
+use std::collections::HashMap;
+use std::collections::hash_map::Entry;
 use std::ffi::CString;
 
-use proc_macro2::{Literal, TokenStream};
+use proc_macro2::{Literal, Span, TokenStream};
 use quote::{ToTokens, format_ident, quote};
 use syn::ext::IdentExt;
 use syn::parse::{Parse, ParseStream};
@@ -20,7 +22,7 @@ pub(crate) fn expand(input: TokenStream) -> syn::Result<TokenStream> {
             else {
                 unreachable!("all keys are literals");
             };
-            x_key.cmp(y_key)
+            x_key.name.cmp(&y_key.name)
         });
     }
 
@@ -118,7 +120,7 @@ struct KeyValuePair {
 }
 
 enum Key {
-    Literal(CString),
+    Literal(LiteralKey),
     Expr(syn::Expr),
 }
 
@@ -171,8 +173,53 @@ impl Parse for Attrset {
             }
         }
 
+        validate_no_duplicate_keys(&pairs)?;
+
         Ok(Self { all_keys_are_literals, pairs })
     }
+}
+
+fn validate_no_duplicate_keys(pairs: &[KeyValuePair]) -> syn::Result<()> {
+    let mut first_occurrences = HashMap::new();
+    let mut errors: Option<syn::Error> = None;
+
+    for pair in pairs {
+        let Key::Literal(key) = &pair.key else {
+            continue;
+        };
+
+        // `#[cfg]` and `#[cfg_attr]` can remove an entry entirely, so skip
+        // static duplicate detection for those cases.
+        if pair.attrs.iter().any(|attr| {
+            attr.path().is_ident("cfg") || attr.path().is_ident("cfg_attr")
+        }) {
+            continue;
+        }
+
+        match first_occurrences.entry(key.name.clone()) {
+            Entry::Vacant(entry) => {
+                entry.insert(key.span);
+            },
+            Entry::Occupied(_) => {
+                let error = syn::Error::new(
+                    key.span,
+                    format!(
+                        "duplicate attrset key `{}`; the first definition is \
+                         earlier in this attrset",
+                        key.name,
+                    ),
+                );
+
+                if let Some(existing_errors) = &mut errors {
+                    existing_errors.combine(error);
+                } else {
+                    errors = Some(error);
+                }
+            },
+        }
+    }
+
+    errors.map_or(Ok(()), Err)
 }
 
 impl Parse for Key {
@@ -189,14 +236,14 @@ impl Parse for Key {
         // c-string literal.
         else {
             let ident = input.call(syn::Ident::parse_any)?;
-            let ident_str = ident.to_string();
-            let c_string = CString::new(ident_str).map_err(|_| {
+            let name = ident.to_string();
+            let c_string = CString::new(name.clone()).map_err(|_| {
                 syn::Error::new(
                     ident.span(),
                     "attrset key cannot contain NUL byte",
                 )
             })?;
-            Ok(Self::Literal(c_string))
+            Ok(Self::Literal(LiteralKey { name, c_string, span: ident.span() }))
         }
     }
 }
@@ -205,8 +252,8 @@ impl ToTokens for Key {
     #[inline]
     fn to_tokens(&self, tokens: &mut TokenStream) {
         match self {
-            Self::Literal(c_string) => {
-                let literal = Literal::c_string(c_string);
+            Self::Literal(key) => {
+                let literal = Literal::c_string(&key.c_string);
                 tokens.extend(quote! {
                     // SAFETY: valid UTF-8.
                     unsafe { ::nixb::expr::Utf8CStr::new_unchecked(#literal) }
@@ -214,5 +261,48 @@ impl ToTokens for Key {
             },
             Self::Expr(expr) => tokens.extend(quote! { { #expr } }),
         }
+    }
+}
+
+struct LiteralKey {
+    name: String,
+    c_string: CString,
+    span: Span,
+}
+
+#[cfg(test)]
+mod tests {
+    use quote::quote;
+
+    use super::expand;
+
+    #[test]
+    fn rejects_each_duplicate_literal_key_after_the_first() {
+        let error = expand(quote! {
+            value1: "Hello",
+            value1: "World",
+            value1: "!",
+        })
+        .unwrap_err();
+
+        let compile_error = error.into_compile_error().to_string();
+
+        assert_eq!(compile_error.matches("compile_error").count(), 2);
+        assert_eq!(
+            compile_error.matches("duplicate attrset key `value1`").count(),
+            2
+        );
+    }
+
+    #[test]
+    fn skips_duplicate_detection_for_cfg_guarded_keys() {
+        assert!(
+            expand(quote! {
+                #[cfg(feature = "foo")]
+                value1: "Hello",
+                value1: "World",
+            })
+            .is_ok()
+        );
     }
 }
