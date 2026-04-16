@@ -404,6 +404,13 @@ impl<T: IntoValue + Clone> Function for T {
     }
 }
 
+impl<'a, T> Arg<'a> for T
+where
+    T: TryFromValue<NixValue<Borrowed<'a>>>,
+{
+    const NAME: &'static CStr = c"arg";
+}
+
 impl<'a, A: Arg<'a>> Args<'a> for A {
     const NAMES: &'static [*const c_char] = &[Self::NAME.as_ptr(), ptr::null()];
 
