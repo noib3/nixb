@@ -1,4 +1,4 @@
-//! This file is generated from Nix 2.32.6 headers. Do not edit it manually.
+//! This file is generated from Nix 152e2880281bbbd9fa03b6215d874eec0d0dc321 headers. Do not edit it manually.
 
 
 pub const __bool_true_false_are_defined: u32 = 1;
@@ -14,6 +14,8 @@ pub const err_NIX_ERR_OVERFLOW: err = -2;
 pub const err_NIX_ERR_KEY: err = -3;
 #[doc = "A generic Nix error occurred.\nThis error code is returned when a generic Nix error occurred during the\nfunction execution."]
 pub const err_NIX_ERR_NIX_ERROR: err = -4;
+#[doc = "A recoverable error occurred.\nThis is used primarily by C API *consumers* to communicate that a failed\nprimop call should be retried on the next evaluation attempt."]
+pub const err_NIX_ERR_RECOVERABLE: err = -5;
 #[doc = "Type for error codes in the Nix system\nThis type can have one of several predefined constants:\n- NIX_OK: No error occurred (0)\n- NIX_ERR_UNKNOWN: An unknown error occurred (-1)\n- NIX_ERR_OVERFLOW: An overflow error occurred (-2)\n- NIX_ERR_KEY: A key/index access error occurred in C API functions (-3)\n- NIX_ERR_NIX_ERROR: A generic Nix error occurred (-4)"]
 pub type err = ::core::ffi::c_int;
 pub const verbosity_NIX_LVL_ERROR: verbosity = 0;
@@ -31,7 +33,7 @@ pub type verbosity = ::core::ffi::c_uint;
 pub struct c_context {
     _unused: [u8; 0],
 }
-#[doc = "Called to get the value of a string owned by Nix.\n\n# Arguments\n\n* `start` [in]  - the string to copy.\n* `n` [in]  - the string length.\n* `user_data` [in]  - optional, arbitrary data, passed to the nix_get_string_callback when it's called."]
+#[doc = "Called to get the value of a string owned by Nix.\nThe `start` data is borrowed and the function must not assume that the buffer persists after it returns.\n\n# Arguments\n\n* `start` [in]  - the string to copy.\n* `n` [in]  - the string length.\n* `user_data` [in]  - optional, arbitrary data, passed to the nix_get_string_callback when it's called."]
 pub type get_string_callback = ::core::option::Option<
     unsafe extern "C" fn(
         start: *const ::core::ffi::c_char,
@@ -127,19 +129,110 @@ unsafe extern "C" {
     #[link_name = "\u{1}_nix_set_verbosity"]
     pub fn set_verbosity(context: *mut c_context, level: verbosity) -> err;
 }
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct Store {
-    _unused: [u8; 0],
-}
+pub type wchar_t = ::core::ffi::c_int;
+pub type max_align_t = f64;
+pub type int_least64_t = i64;
+pub type uint_least64_t = u64;
+pub type int_fast64_t = i64;
+pub type uint_fast64_t = u64;
+pub type int_least32_t = i32;
+pub type uint_least32_t = u32;
+pub type int_fast32_t = i32;
+pub type uint_fast32_t = u32;
+pub type int_least16_t = i16;
+pub type uint_least16_t = u16;
+pub type int_fast16_t = i16;
+pub type uint_fast16_t = u16;
+pub type int_least8_t = i8;
+pub type uint_least8_t = u8;
+pub type int_fast8_t = i8;
+pub type uint_fast8_t = u8;
+pub type intmax_t = ::core::ffi::c_long;
+pub type uintmax_t = ::core::ffi::c_ulong;
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct StorePath {
     _unused: [u8; 0],
 }
+unsafe extern "C" {
+    #[doc = "Copy a StorePath\n\n# Arguments\n\n* `p` [in]  - the path to copy\n\n# Returns\n\na new StorePath"]
+    #[link_name = "\u{1}_nix_store_path_clone"]
+    pub fn store_path_clone(p: *const StorePath) -> *mut StorePath;
+}
+unsafe extern "C" {
+    #[doc = "Deallocate a StorePath\nDoes not fail.\n\n# Arguments\n\n* `p` [in]  - the path to free"]
+    #[link_name = "\u{1}_nix_store_path_free"]
+    pub fn store_path_free(p: *mut StorePath);
+}
+unsafe extern "C" {
+    #[doc = "Get the path name (e.g. \"<name>\" in /nix/store/<hash>-<name>)\n\n# Arguments\n\n* `store_path` [in]  - the path to get the name from\n* `callback` [in]  - called with the name\n* `user_data` [in]  - arbitrary data, passed to the callback when it's called."]
+    #[link_name = "\u{1}_nix_store_path_name"]
+    pub fn store_path_name(
+        store_path: *const StorePath,
+        callback: get_string_callback,
+        user_data: *mut ::core::ffi::c_void,
+    );
+}
+#[doc = "A store path hash\nOnce decoded from \"nix32\" encoding, a store path hash is 20 raw bytes."]
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct store_path_hash_part {
+    pub bytes: [u8; 20usize],
+}
+#[allow(clippy::unnecessary_operation, clippy::identity_op)]
+const _: () = {
+    ["Size of store_path_hash_part"][::core::mem::size_of::<store_path_hash_part>() - 20usize];
+    ["Alignment of store_path_hash_part"][::core::mem::align_of::<store_path_hash_part>() - 1usize];
+    ["Offset of field: store_path_hash_part::bytes"]
+        [::core::mem::offset_of!(store_path_hash_part, bytes) - 0usize];
+};
+unsafe extern "C" {
+    #[doc = "Get the path hash (e.g. \"<hash>\" in /nix/store/<hash>-<name>)\nThe hash is returned as raw bytes, decoded from \"nix32\" encoding.\n\n# Arguments\n\n* `context` [out]  - Optional, stores error information\n* `store_path` [in]  - the path to get the hash from\n* `hash_part_out` [out]  - the decoded hash as 20 raw bytes\n\n# Returns\n\nNIX_OK on success, error code on failure"]
+    #[link_name = "\u{1}_nix_store_path_hash"]
+    pub fn store_path_hash(
+        context: *mut c_context,
+        store_path: *const StorePath,
+        hash_part_out: *mut store_path_hash_part,
+    ) -> err;
+}
+unsafe extern "C" {
+    #[doc = "Create a StorePath from its constituent parts (hash and name)\nThis function constructs a store path from a hash and name, without needing\na Store reference or the store directory prefix.\n> **Note** Don't forget to free this path using nix_store_path_free()!\n\n# Arguments\n\n* `context` [out]  - Optional, stores error information\n* `hash` [in]  - The store path hash (20 raw bytes)\n* `name` [in]  - The store path name (the part after the hash)\n* `name_len` [in]  - Length of the name string\n\n# Returns\n\nowned store path, NULL on error"]
+    #[link_name = "\u{1}_nix_store_create_from_parts"]
+    pub fn store_create_from_parts(
+        context: *mut c_context,
+        hash: *const store_path_hash_part,
+        name: *const ::core::ffi::c_char,
+        name_len: usize,
+    ) -> *mut StorePath;
+}
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct derivation {
+    _unused: [u8; 0],
+}
+unsafe extern "C" {
+    #[doc = "Copy a `nix_derivation`\n\n# Arguments\n\n* `d` [in]  - the derivation to copy\n\n# Returns\n\na new `nix_derivation`"]
+    #[link_name = "\u{1}_nix_derivation_clone"]
+    pub fn derivation_clone(d: *const derivation) -> *mut derivation;
+}
+unsafe extern "C" {
+    #[doc = "Deallocate a `nix_derivation`\nDoes not fail.\n\n# Arguments\n\n* `drv` [in]  - the derivation to free"]
+    #[link_name = "\u{1}_nix_derivation_free"]
+    pub fn derivation_free(drv: *mut derivation);
+}
+unsafe extern "C" {
+    #[doc = "Gets the derivation as a JSON string\n\n# Arguments\n\n* `context` [out]  - Optional, stores error information\n* `drv` [in]  - The derivation\n* `callback` [in]  - Called with the JSON string\n* `userdata` [in]  - Arbitrary data passed to the callback"]
+    #[link_name = "\u{1}_nix_derivation_to_json"]
+    pub fn derivation_to_json(
+        context: *mut c_context,
+        drv: *const derivation,
+        callback: get_string_callback,
+        userdata: *mut ::core::ffi::c_void,
+    ) -> err;
+}
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct Store {
     _unused: [u8; 0],
 }
 unsafe extern "C" {
@@ -187,32 +280,13 @@ unsafe extern "C" {
     ) -> err;
 }
 unsafe extern "C" {
-    #[doc = "Parse a Nix store path into a StorePath\n> **Note** Don't forget to free this path using nix_store_path_free()!\n\n# Arguments\n\n* `context` [out]  - Optional, stores error information\n* `store` [in]  - nix store reference\n* `path` [in]  - Path string to parse, copied\n\n# Returns\n\nowned store path, NULL on error"]
+    #[doc = "Parse a Nix store path that includes the store dir into a StorePath\n> **Note** Don't forget to free this path using nix_store_path_free()!\n\n# Arguments\n\n* `context` [out]  - Optional, stores error information\n* `store` [in]  - nix store reference\n* `path` [in]  - Path string to parse, copied\n\n# Returns\n\nowned store path, NULL on error"]
     #[link_name = "\u{1}_nix_store_parse_path"]
     pub fn store_parse_path(
         context: *mut c_context,
         store: *mut Store,
         path: *const ::core::ffi::c_char,
     ) -> *mut StorePath;
-}
-unsafe extern "C" {
-    #[doc = "Get the path name (e.g. \"name\" in /nix/store/...-name)\n\n# Arguments\n\n* `store_path` [in]  - the path to get the name from\n* `callback` [in]  - called with the name\n* `user_data` [in]  - arbitrary data, passed to the callback when it's called."]
-    #[link_name = "\u{1}_nix_store_path_name"]
-    pub fn store_path_name(
-        store_path: *const StorePath,
-        callback: get_string_callback,
-        user_data: *mut ::core::ffi::c_void,
-    );
-}
-unsafe extern "C" {
-    #[doc = "Copy a StorePath\n\n# Arguments\n\n* `p` [in]  - the path to copy\n\n# Returns\n\na new StorePath"]
-    #[link_name = "\u{1}_nix_store_path_clone"]
-    pub fn store_path_clone(p: *const StorePath) -> *mut StorePath;
-}
-unsafe extern "C" {
-    #[doc = "Deallocate a StorePath\nDoes not fail.\n\n# Arguments\n\n* `p` [in]  - the path to free"]
-    #[link_name = "\u{1}_nix_store_path_free"]
-    pub fn store_path_free(p: *mut StorePath);
 }
 unsafe extern "C" {
     #[doc = "Check if a StorePath is valid (i.e. that corresponding store object and its closure of references exists in\nthe store)\n\n# Arguments\n\n* `context` [out]  - Optional, stores error information\n* `store` [in]  - Nix Store reference\n* `path` [in]  - Path to check\n\n# Returns\n\ntrue or false, error info in context"]
@@ -235,7 +309,7 @@ unsafe extern "C" {
     ) -> err;
 }
 unsafe extern "C" {
-    #[doc = "Realise a Nix store path\nBlocking, calls callback once for each realised output.\n> **Note** When working with expressions, consider using e.g. nix_string_realise to get the output. `.drvPath` may not be\naccurate or available in the future. See https://github.com/NixOS/nix/issues/6507\n\n# Arguments\n\n* `context` [out]  - Optional, stores error information\n* `store` [in]  - Nix Store reference\n* `path` [in]  - Path to build\n* `userdata` [in]  - data to pass to every callback invocation\n* `callback` [in]  - called for every realised output"]
+    #[doc = "Realise a Nix store path\nBlocking, calls callback once for each realised output.\n> **Note** When working with expressions, consider using e.g. nix_string_realise to get the output. `.drvPath` may not be\naccurate or available in the future. See https://github.com/NixOS/nix/issues/6507\n\n# Arguments\n\n* `context` [out]  - Optional, stores error information\n* `store` [in]  - Nix Store reference\n* `path` [in]  - Path to build\n* `userdata` [in]  - data to pass to every callback invocation\n* `callback` [in]  - called for every realised output\n\n# Returns\n\nNIX_OK if the build succeeded, or an error code if the build/scheduling/outputs/copying/etc failed.\nOn error, the callback is never invoked and error information is stored in context."]
     #[link_name = "\u{1}_nix_store_realise"]
     pub fn store_realise(
         context: *mut c_context,
@@ -262,7 +336,7 @@ unsafe extern "C" {
     ) -> err;
 }
 unsafe extern "C" {
-    #[doc = "Create a `nix_derivation` from a JSON representation of that derivation.\n\n# Arguments\n\n* `context` [out]  - Optional, stores error information.\n* `store` [in]  - nix store reference.\n* `json` [in]  - JSON of the derivation as a string."]
+    #[doc = "Create a `nix_derivation` from a JSON representation of that derivation.\n> **Note** Unlike `nix_derivation_to_json`, this needs a `Store`. This is because\nover time we expect the internal representation of derivations in Nix to\ndiffer from accepted derivation formats. The store argument is here to help\nany logic needed to convert from JSON to the internal representation, in\nexcess of just parsing.\n\n# Arguments\n\n* `context` [out]  - Optional, stores error information.\n* `store` [in]  - nix store reference.\n* `json` [in]  - JSON of the derivation as a string.\n\n# Returns\n\nA new derivation, or NULL on error. Free with `nix_derivation_free` when done using the `nix_derivation`."]
     #[link_name = "\u{1}_nix_derivation_from_json"]
     pub fn derivation_from_json(
         context: *mut c_context,
@@ -280,11 +354,6 @@ unsafe extern "C" {
     ) -> *mut StorePath;
 }
 unsafe extern "C" {
-    #[doc = "Deallocate a `nix_derivation`\nDoes not fail.\n\n# Arguments\n\n* `drv` [in]  - the derivation to free"]
-    #[link_name = "\u{1}_nix_derivation_free"]
-    pub fn derivation_free(drv: *mut derivation);
-}
-unsafe extern "C" {
     #[doc = "Copy the closure of `path` from `srcStore` to `dstStore`.\n\n# Arguments\n\n* `context` [out]  - Optional, stores error information\n* `srcStore` [in]  - nix source store reference\n* `dstStore` [in]  - nix destination store reference\n* `path` [in]  - Path to copy"]
     #[link_name = "\u{1}_nix_store_copy_closure"]
     pub fn store_copy_closure(
@@ -294,8 +363,56 @@ unsafe extern "C" {
         path: *mut StorePath,
     ) -> err;
 }
-pub type wchar_t = ::core::ffi::c_int;
-pub type max_align_t = f64;
+unsafe extern "C" {
+    #[doc = "Gets the closure of a specific store path\n> **Note** The callback borrows each StorePath only for the duration of the call.\n\n# Arguments\n\n* `context` [out]  - Optional, stores error information\n* `store` [in]  - nix store reference\n* `store_path` [in]  - The path to compute from\n* `flip_direction` [in]  - If false, compute the forward closure (paths referenced by any store path in the closure).\nIf true, compute the backward closure (paths that reference any store path in the closure).\n* `include_outputs` [in]  - If flip_direction is false: for any derivation in the closure, include its outputs.\nIf flip_direction is true: for any output in the closure, include derivations that produce\nit.\n* `include_derivers` [in]  - If flip_direction is false: for any output in the closure, include the derivation that\nproduced it.\nIf flip_direction is true: for any derivation in the closure, include its outputs.\n* `callback` [in]  - The function to call for every store path, in no particular order\n* `userdata` [in]  - The userdata to pass to the callback"]
+    #[link_name = "\u{1}_nix_store_get_fs_closure"]
+    pub fn store_get_fs_closure(
+        context: *mut c_context,
+        store: *mut Store,
+        store_path: *const StorePath,
+        flip_direction: bool,
+        include_outputs: bool,
+        include_derivers: bool,
+        userdata: *mut ::core::ffi::c_void,
+        callback: ::core::option::Option<
+            unsafe extern "C" fn(
+                context: *mut c_context,
+                userdata: *mut ::core::ffi::c_void,
+                store_path: *const StorePath,
+            ),
+        >,
+    ) -> err;
+}
+unsafe extern "C" {
+    #[doc = "Returns the derivation associated with the store path\n\n# Arguments\n\n* `context` [out]  - Optional, stores error information\n* `store` [in]  - The nix store\n* `path` [in]  - The nix store path\n\n# Returns\n\nA new derivation, or NULL on error. Free with `nix_derivation_free` when done using the `nix_derivation`."]
+    #[link_name = "\u{1}_nix_store_drv_from_store_path"]
+    pub fn store_drv_from_store_path(
+        context: *mut c_context,
+        store: *mut Store,
+        path: *const StorePath,
+    ) -> *mut derivation;
+}
+unsafe extern "C" {
+    #[doc = "Query the full store path given the hash part of a valid store\npath, or empty if no matching path is found.\n\n# Arguments\n\n* `context` [out]  - Optional, stores error information\n* `store` [in]  - nix store reference\n* `hash` [in]  - Hash part of path as a string\n\n# Returns\n\nStore path reference, NULL if no matching path is found."]
+    #[link_name = "\u{1}_nix_store_query_path_from_hash_part"]
+    pub fn store_query_path_from_hash_part(
+        context: *mut c_context,
+        store: *mut Store,
+        hash: *const ::core::ffi::c_char,
+    ) -> *mut StorePath;
+}
+unsafe extern "C" {
+    #[doc = "Copy a path from one store to another.\n\n# Arguments\n\n* `context` [out]  - Optional, stores error information\n* `srcStore` [in]  - nix source store reference\n* `dstStore` [in]  - nix destination store reference\n* `path` [in]  - The path to copy\n* `repair` [in]  - Whether to repair the path\n* `checkSigs` [in]  - Whether to check path signatures are trusted before copying"]
+    #[link_name = "\u{1}_nix_store_copy_path"]
+    pub fn store_copy_path(
+        context: *mut c_context,
+        srcStore: *mut Store,
+        dstStore: *mut Store,
+        path: *const StorePath,
+        repair: bool,
+        checkSigs: bool,
+    ) -> err;
+}
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct eval_state_builder {
@@ -311,14 +428,15 @@ pub struct EvalState {
 pub struct value {
     _unused: [u8; 0],
 }
+#[doc = "> **Deprecated** Use nix_value instead"]
 pub type Value = value;
 unsafe extern "C" {
-    #[doc = "Initialize the Nix language evaluator.\nThis function must be called at least once,\nat some point before constructing a EvalState for the first time.\nThis function can be called multiple times, and is idempotent.\n\n# Arguments\n\n* `context` [out]  - Optional, stores error information\n\n# Returns\n\nNIX_OK if the initialization was successful, an error code otherwise."]
+    #[doc = "Initialize the Nix language evaluator.\n@ingroup libexpr_init\nThis function must be called at least once,\nat some point before constructing a EvalState for the first time.\nThis function can be called multiple times, and is idempotent.\n\n# Arguments\n\n* `context` [out]  - Optional, stores error information\n\n# Returns\n\nNIX_OK if the initialization was successful, an error code otherwise."]
     #[link_name = "\u{1}_nix_libexpr_init"]
     pub fn libexpr_init(context: *mut c_context) -> err;
 }
 unsafe extern "C" {
-    #[doc = "Parses and evaluates a Nix expression from a string.\n\n# Arguments\n\n* `context` [out]  - Optional, stores error information\n* `state` [in]  - The state of the evaluation.\n* `expr` [in]  - The Nix expression to parse.\n* `path` [in]  - The file path to associate with the expression.\nThis is required for expressions that contain relative paths (such as `./.`) that are resolved relative to the given\ndirectory.\n* `value` [out]  - The result of the evaluation. You must allocate this\nyourself.\n\n# Returns\n\nNIX_OK if the evaluation was successful, an error code otherwise."]
+    #[doc = "Parses and evaluates a Nix expression from a string.\n@ingroup value_create\n\n# Arguments\n\n* `context` [out]  - Optional, stores error information\n* `state` [in]  - The state of the evaluation.\n* `expr` [in]  - The Nix expression to parse.\n* `path` [in]  - The file path to associate with the expression.\nThis is required for expressions that contain relative paths (such as `./.`) that are resolved relative to the given\ndirectory.\n* `value` [out]  - The result of the evaluation. You must allocate this\nyourself.\n\n# Returns\n\nNIX_OK if the evaluation was successful, an error code otherwise."]
     #[link_name = "\u{1}_nix_expr_eval_from_string"]
     pub fn expr_eval_from_string(
         context: *mut c_context,
@@ -329,7 +447,7 @@ unsafe extern "C" {
     ) -> err;
 }
 unsafe extern "C" {
-    #[doc = "Calls a Nix function with an argument.\n\n# Arguments\n\n* `context` [out]  - Optional, stores error information\n* `state` [in]  - The state of the evaluation.\n* `fn` [in]  - The Nix function to call.\n* `arg` [in]  - The argument to pass to the function.\n* `value` [out]  - The result of the function call.\n\n# Returns\n\nNIX_OK if the function call was successful, an error code otherwise.\n\n# See also\n\n> [`nix_init_apply()`] for a similar function that does not performs the call immediately, but stores it as a thunk.\nNote the different argument order."]
+    #[doc = "Calls a Nix function with an argument.\n@ingroup value_create\n\n# Arguments\n\n* `context` [out]  - Optional, stores error information\n* `state` [in]  - The state of the evaluation.\n* `fn` [in]  - The Nix function to call.\n* `arg` [in]  - The argument to pass to the function.\n* `value` [out]  - The result of the function call.\n\n# Returns\n\nNIX_OK if the function call was successful, an error code otherwise.\n\n# See also\n\n> [`nix_init_apply()`] for a similar function that does not performs the call immediately, but stores it as a thunk.\nNote the different argument order."]
     #[link_name = "\u{1}_nix_value_call"]
     pub fn value_call(
         context: *mut c_context,
@@ -340,7 +458,7 @@ unsafe extern "C" {
     ) -> err;
 }
 unsafe extern "C" {
-    #[doc = "Calls a Nix function with multiple arguments.\nTechnically these are functions that return functions. It is common for Nix\nfunctions to be curried, so this function is useful for calling them.\n\n# Arguments\n\n* `context` [out]  - Optional, stores error information\n* `state` [in]  - The state of the evaluation.\n* `fn` [in]  - The Nix function to call.\n* `nargs` [in]  - The number of arguments.\n* `args` [in]  - The arguments to pass to the function.\n* `value` [out]  - The result of the function call.\n\n# See also\n\n> [`nix_value_call`]     For the single argument primitive.\n> [`NIX_VALUE_CALL`]           For a macro that wraps this function for convenience."]
+    #[doc = "Calls a Nix function with multiple arguments.\n@ingroup value_create\nTechnically these are functions that return functions. It is common for Nix\nfunctions to be curried, so this function is useful for calling them.\n\n# Arguments\n\n* `context` [out]  - Optional, stores error information\n* `state` [in]  - The state of the evaluation.\n* `fn` [in]  - The Nix function to call.\n* `nargs` [in]  - The number of arguments.\n* `args` [in]  - The arguments to pass to the function.\n* `value` [out]  - The result of the function call.\n\n# See also\n\n> [`nix_value_call`]     For the single argument primitive.\n> [`NIX_VALUE_CALL`]           For a macro that wraps this function for convenience."]
     #[link_name = "\u{1}_nix_value_call_multi"]
     pub fn value_call_multi(
         context: *mut c_context,
@@ -352,7 +470,7 @@ unsafe extern "C" {
     ) -> err;
 }
 unsafe extern "C" {
-    #[doc = "Forces the evaluation of a Nix value.\nThe Nix interpreter is lazy, and not-yet-evaluated values can be\nof type NIX_TYPE_THUNK instead of their actual value.\nThis function mutates such a `nix_value`, so that, if successful, it has its final type.\n\n# Arguments\n\n* `context` [out]  - Optional, stores error information\n* `state` [in]  - The state of the evaluation.\n* `value` [in,out]  - The Nix value to force.\n@post value is not of type NIX_TYPE_THUNK\n\n# Returns\n\nNIX_OK if the force operation was successful, an error code\notherwise."]
+    #[doc = "Forces the evaluation of a Nix value.\n@ingroup value_create\nThe Nix interpreter is lazy, and not-yet-evaluated values can be\nof type NIX_TYPE_THUNK instead of their actual value.\nThis function mutates such a `nix_value`, so that, if successful, it has its final type.\n\n# Arguments\n\n* `context` [out]  - Optional, stores error information\n* `state` [in]  - The state of the evaluation.\n* `value` [in,out]  - The Nix value to force.\n@post value is not of type NIX_TYPE_THUNK\n\n# Returns\n\nNIX_OK if the force operation was successful, an error code\notherwise."]
     #[link_name = "\u{1}_nix_value_force"]
     pub fn value_force(context: *mut c_context, state: *mut EvalState, value: *mut value) -> err;
 }
@@ -366,7 +484,7 @@ unsafe extern "C" {
     ) -> err;
 }
 unsafe extern "C" {
-    #[doc = "Create a new nix_eval_state_builder\nThe settings are initialized to their default value.\nValues can be sourced elsewhere with nix_eval_state_builder_load.\n\n# Arguments\n\n* `context` [out]  - Optional, stores error information\n* `store` [in]  - The Nix store to use.\n\n# Returns\n\nA new nix_eval_state_builder or NULL on failure."]
+    #[doc = "Create a new nix_eval_state_builder\n@ingroup libexpr_init\nThe settings are initialized to their default value.\nValues can be sourced elsewhere with nix_eval_state_builder_load.\n\n# Arguments\n\n* `context` [out]  - Optional, stores error information\n* `store` [in]  - The Nix store to use.\n\n# Returns\n\nA new nix_eval_state_builder or NULL on failure. Call nix_eval_state_builder_free() when you're done."]
     #[link_name = "\u{1}_nix_eval_state_builder_new"]
     pub fn eval_state_builder_new(
         context: *mut c_context,
@@ -374,7 +492,7 @@ unsafe extern "C" {
     ) -> *mut eval_state_builder;
 }
 unsafe extern "C" {
-    #[doc = "Read settings from the ambient environment\nSettings are sourced from environment variables and configuration files,\nas documented in the Nix manual.\n\n# Arguments\n\n* `context` [out]  - Optional, stores error information\n* `builder` [out]  - The builder to modify.\n\n# Returns\n\nNIX_OK if successful, an error code otherwise."]
+    #[doc = "Read settings from the ambient environment\n@ingroup libexpr_init\nSettings are sourced from environment variables and configuration files,\nas documented in the Nix manual.\n\n# Arguments\n\n* `context` [out]  - Optional, stores error information\n* `builder` [out]  - The builder to modify.\n\n# Returns\n\nNIX_OK if successful, an error code otherwise."]
     #[link_name = "\u{1}_nix_eval_state_builder_load"]
     pub fn eval_state_builder_load(
         context: *mut c_context,
@@ -382,7 +500,7 @@ unsafe extern "C" {
     ) -> err;
 }
 unsafe extern "C" {
-    #[doc = "Set the lookup path for `<...>` expressions\n\n# Arguments\n\n* `context` [in]  - Optional, stores error information\n* `builder` [in]  - The builder to modify.\n* `lookupPath` [in]  - Null-terminated array of strings corresponding to entries in NIX_PATH."]
+    #[doc = "Set the lookup path for `<...>` expressions\n@ingroup libexpr_init\n\n# Arguments\n\n* `context` [in]  - Optional, stores error information\n* `builder` [in]  - The builder to modify.\n* `lookupPath` [in]  - Null-terminated array of strings corresponding to entries in NIX_PATH."]
     #[link_name = "\u{1}_nix_eval_state_builder_set_lookup_path"]
     pub fn eval_state_builder_set_lookup_path(
         context: *mut c_context,
@@ -391,7 +509,7 @@ unsafe extern "C" {
     ) -> err;
 }
 unsafe extern "C" {
-    #[doc = "Create a new Nix language evaluator state\nRemember to nix_eval_state_builder_free after building the state.\n\n# Arguments\n\n* `context` [out]  - Optional, stores error information\n* `builder` [in]  - The builder to use and free\n\n# Returns\n\nA new Nix state or NULL on failure.\n\n# See also\n\n> [`nix_eval_state_builder_new,`] nix_eval_state_builder_free"]
+    #[doc = "Create a new Nix language evaluator state\n@ingroup libexpr_init\nThe builder becomes unusable after this call. Remember to call nix_eval_state_builder_free()\nafter building the state.\n\n# Arguments\n\n* `context` [out]  - Optional, stores error information\n* `builder` [in]  - The builder to use and free\n\n# Returns\n\nA new Nix state or NULL on failure. Call nix_state_free() when you're done.\n\n# See also\n\n> [`nix_eval_state_builder_new,`] nix_eval_state_builder_free"]
     #[link_name = "\u{1}_nix_eval_state_build"]
     pub fn eval_state_build(
         context: *mut c_context,
@@ -399,12 +517,12 @@ unsafe extern "C" {
     ) -> *mut EvalState;
 }
 unsafe extern "C" {
-    #[doc = "Free a nix_eval_state_builder\nDoes not fail.\n\n# Arguments\n\n* `builder` [in]  - The builder to free."]
+    #[doc = "Free a nix_eval_state_builder\n@ingroup libexpr_init\nDoes not fail.\n\n# Arguments\n\n* `builder` [in]  - The builder to free."]
     #[link_name = "\u{1}_nix_eval_state_builder_free"]
     pub fn eval_state_builder_free(builder: *mut eval_state_builder);
 }
 unsafe extern "C" {
-    #[doc = "Create a new Nix language evaluator state\nFor more control, use nix_eval_state_builder\n\n# Arguments\n\n* `context` [out]  - Optional, stores error information\n* `lookupPath` [in]  - Null-terminated array of strings corresponding to entries in NIX_PATH.\n* `store` [in]  - The Nix store to use.\n\n# Returns\n\nA new Nix state or NULL on failure.\n\n# See also\n\n> [`nix_state_builder_new`]"]
+    #[doc = "Create a new Nix language evaluator state\n@ingroup libexpr_init\nFor more control, use nix_eval_state_builder\n\n# Arguments\n\n* `context` [out]  - Optional, stores error information\n* `lookupPath` [in]  - Null-terminated array of strings corresponding to entries in NIX_PATH.\n* `store` [in]  - The Nix store to use.\n\n# Returns\n\nA new Nix state or NULL on failure. Call nix_state_free() when you're done.\n\n# See also\n\n> [`nix_state_builder_new`]"]
     #[link_name = "\u{1}_nix_state_create"]
     pub fn state_create(
         context: *mut c_context,
@@ -413,7 +531,7 @@ unsafe extern "C" {
     ) -> *mut EvalState;
 }
 unsafe extern "C" {
-    #[doc = "Frees a Nix state.\nDoes not fail.\n\n# Arguments\n\n* `state` [in]  - The state to free."]
+    #[doc = "Frees a Nix state.\n@ingroup libexpr_init\nDoes not fail.\n\n# Arguments\n\n* `state` [in]  - The state to free."]
     #[link_name = "\u{1}_nix_state_free"]
     pub fn state_free(state: *mut EvalState);
 }
@@ -423,7 +541,7 @@ unsafe extern "C" {
     pub fn gc_incref(context: *mut c_context, object: *const ::core::ffi::c_void) -> err;
 }
 unsafe extern "C" {
-    #[doc = "Decrement the garbage collector reference counter for the given object\nWe also provide typed `nix_*_decref` functions, which are\n- safer to use\n- easier to integrate when deriving bindings\n- allow more flexibility\n\n# Arguments\n\n* `context` [out]  - Optional, stores error information\n* `object` [in]  - The object to stop referencing"]
+    #[doc = "Decrement the garbage collector reference counter for the given object\n> **Deprecated** We are phasing out the general nix_gc_decref() in favor of type-specified free functions, such as\nnix_value_decref().\nWe also provide typed `nix_*_decref` functions, which are\n- safer to use\n- easier to integrate when deriving bindings\n- allow more flexibility\n\n# Arguments\n\n* `context` [out]  - Optional, stores error information\n* `object` [in]  - The object to stop referencing"]
     #[link_name = "\u{1}_nix_gc_decref"]
     pub fn gc_decref(context: *mut c_context, object: *const ::core::ffi::c_void) -> err;
 }
@@ -443,35 +561,31 @@ unsafe extern "C" {
         >,
     );
 }
-pub type int_least64_t = i64;
-pub type uint_least64_t = u64;
-pub type int_fast64_t = i64;
-pub type uint_fast64_t = u64;
-pub type int_least32_t = i32;
-pub type uint_least32_t = u32;
-pub type int_fast32_t = i32;
-pub type uint_fast32_t = u32;
-pub type int_least16_t = i16;
-pub type uint_least16_t = u16;
-pub type int_fast16_t = i16;
-pub type uint_fast16_t = u16;
-pub type int_least8_t = i8;
-pub type uint_least8_t = u8;
-pub type int_fast8_t = i8;
-pub type uint_fast8_t = u8;
-pub type intmax_t = ::core::ffi::c_long;
-pub type uintmax_t = ::core::ffi::c_ulong;
+#[doc = "Unevaluated expression\nThunks often contain an expression and closure, but may contain other\nrepresentations too.\nTheir state is mutable, unlike that of the other types."]
 pub const ValueType_NIX_TYPE_THUNK: ValueType = 0;
+#[doc = "A 64 bit signed integer."]
 pub const ValueType_NIX_TYPE_INT: ValueType = 1;
+#[doc = "IEEE 754 double precision floating point number\n\n# See also\n\n> [https://nix.dev/manual/nix/latest/language/types.html#type-float](https://nix.dev/manual/nix/latest/language/types.html#type-float)"]
 pub const ValueType_NIX_TYPE_FLOAT: ValueType = 2;
+#[doc = "Boolean true or false value\n\n# See also\n\n> [https://nix.dev/manual/nix/latest/language/types.html#type-bool](https://nix.dev/manual/nix/latest/language/types.html#type-bool)"]
 pub const ValueType_NIX_TYPE_BOOL: ValueType = 3;
+#[doc = "String value with context\nString content may contain arbitrary bytes, not necessarily UTF-8.\n\n# See also\n\n> [https://nix.dev/manual/nix/latest/language/types.html#type-string](https://nix.dev/manual/nix/latest/language/types.html#type-string)"]
 pub const ValueType_NIX_TYPE_STRING: ValueType = 4;
+#[doc = "Filesystem path\n\n# See also\n\n> [https://nix.dev/manual/nix/latest/language/types.html#type-path](https://nix.dev/manual/nix/latest/language/types.html#type-path)"]
 pub const ValueType_NIX_TYPE_PATH: ValueType = 5;
+#[doc = "Null value\n\n# See also\n\n> [https://nix.dev/manual/nix/latest/language/types.html#type-null](https://nix.dev/manual/nix/latest/language/types.html#type-null)"]
 pub const ValueType_NIX_TYPE_NULL: ValueType = 6;
+#[doc = "Attribute set (key-value mapping)\n\n# See also\n\n> [https://nix.dev/manual/nix/latest/language/types.html#type-attrs](https://nix.dev/manual/nix/latest/language/types.html#type-attrs)"]
 pub const ValueType_NIX_TYPE_ATTRS: ValueType = 7;
+#[doc = "Ordered list of values\n\n# See also\n\n> [https://nix.dev/manual/nix/latest/language/types.html#type-list](https://nix.dev/manual/nix/latest/language/types.html#type-list)"]
 pub const ValueType_NIX_TYPE_LIST: ValueType = 8;
+#[doc = "Function (lambda or builtin)\n\n# See also\n\n> [https://nix.dev/manual/nix/latest/language/types.html#type-function](https://nix.dev/manual/nix/latest/language/types.html#type-function)"]
 pub const ValueType_NIX_TYPE_FUNCTION: ValueType = 9;
+#[doc = "External value from C++ plugins or C API\n\n# See also\n\n> [`Externals`]"]
 pub const ValueType_NIX_TYPE_EXTERNAL: ValueType = 10;
+#[doc = "External value from C++ plugins or C API\n\n# See also\n\n> [`Externals`]"]
+pub const ValueType_NIX_TYPE_FAILED: ValueType = 11;
+#[doc = "Represents the state of a Nix value\nThunk values (NIX_TYPE_THUNK) change to their final, unchanging type when forced.\n\n# See also\n\n> [https://nix.dev/manual/nix/latest/language/evaluation.html](https://nix.dev/manual/nix/latest/language/evaluation.html)\n@enum ValueType\n@ingroup value"]
 pub type ValueType = ::core::ffi::c_uint;
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
@@ -498,7 +612,7 @@ pub struct ExternalValue {
 pub struct realised_string {
     _unused: [u8; 0],
 }
-#[doc = "@defgroup primops Adding primops\n/\n/** Function pointer for primops\nWhen you want to return an error, call nix_set_err_msg(context, NIX_ERR_UNKNOWN, \"your error message here\").\n\n# Arguments\n\n* `user_data` [in]  - Arbitrary data that was initially supplied to nix_alloc_primop\n* `context` [out]  - Stores error information.\n* `state` [in]  - Evaluator state\n* `args` [in]  - list of arguments. Note that these can be thunks and should be forced using nix_value_force before\nuse.\n* `ret` [out]  - return value\n\n# See also\n\n> [`nix_alloc_primop,`] nix_init_primop"]
+#[doc = "Function pointer for primops\n@ingroup primops\nWhen you want to return an error, call nix_set_err_msg(context, NIX_ERR_UNKNOWN, \"your error message here\").\n\n# Arguments\n\n* `user_data` [in]  - Arbitrary data that was initially supplied to nix_alloc_primop\n* `context` [out]  - Stores error information.\n* `state` [in]  - Evaluator state\n* `args` [in]  - list of arguments. Note that these can be thunks and should be forced using nix_value_force before\nuse.\n* `ret` [out]  - return value\n\n# See also\n\n> [`nix_alloc_primop,`] nix_init_primop"]
 pub type PrimOpFun = ::core::option::Option<
     unsafe extern "C" fn(
         user_data: *mut ::core::ffi::c_void,
@@ -509,7 +623,7 @@ pub type PrimOpFun = ::core::option::Option<
     ),
 >;
 unsafe extern "C" {
-    #[doc = "Allocate a PrimOp\nOwned by the garbage collector.\nUse nix_gc_decref() when you're done with the returned PrimOp.\n\n# Arguments\n\n* `context` [out]  - Optional, stores error information\n* `fun` [in]  - callback\n* `arity` [in]  - expected number of function arguments\n* `name` [in]  - function name\n* `args` [in]  - array of argument names, NULL-terminated\n* `doc` [in]  - optional, documentation for this primop\n* `user_data` [in]  - optional, arbitrary data, passed to the callback when it's called\n\n# Returns\n\nprimop, or null in case of errors\n\n# See also\n\n> [`nix_init_primop`]"]
+    #[doc = "Allocate a PrimOp\n@ingroup primops\nCall nix_gc_decref() when you're done with the returned PrimOp.\n\n# Arguments\n\n* `context` [out]  - Optional, stores error information\n* `fun` [in]  - callback\n* `arity` [in]  - expected number of function arguments\n* `name` [in]  - function name\n* `args` [in]  - array of argument names, NULL-terminated\n* `doc` [in]  - optional, documentation for this primop\n* `user_data` [in]  - optional, arbitrary data, passed to the callback when it's called\n\n# Returns\n\nprimop, or null in case of errors\n\n# See also\n\n> [`nix_init_primop`]"]
     #[link_name = "\u{1}_nix_alloc_primop"]
     pub fn alloc_primop(
         context: *mut c_context,
@@ -522,43 +636,43 @@ unsafe extern "C" {
     ) -> *mut PrimOp;
 }
 unsafe extern "C" {
-    #[doc = "add a primop to the `builtins` attribute set\nOnly applies to States created after this call.\nMoves your PrimOp content into the global evaluator\nregistry, meaning your input PrimOp pointer is no longer usable.\nYou are free to remove your references to it,\nafter which it will be garbage collected.\n\n# Arguments\n\n* `context` [out]  - Optional, stores error information\n\n# Returns\n\nprimop, or null in case of errors\n"]
+    #[doc = "add a primop to the `builtins` attribute set\n@ingroup primops\nOnly applies to States created after this call.\nMoves your PrimOp content into the global evaluator registry, meaning\nyour input PrimOp pointer becomes invalid. The PrimOp must not be used\nwith nix_init_primop() before or after this call, as this would cause\nundefined behavior.\nYou must call nix_gc_decref() on the original PrimOp pointer\nafter this call to release your reference.\n\n# Arguments\n\n* `context` [out]  - Optional, stores error information\n* `primOp` [in]  - PrimOp to register\n\n# Returns\n\nerror code, NIX_OK on success"]
     #[link_name = "\u{1}_nix_register_primop"]
     pub fn register_primop(context: *mut c_context, primOp: *mut PrimOp) -> err;
 }
 unsafe extern "C" {
-    #[doc = "Allocate a Nix value\nOwned by the GC. Use nix_gc_decref() when you're done with the pointer\n\n# Arguments\n\n* `context` [out]  - Optional, stores error information\n* `state` [in]  - nix evaluator state\n\n# Returns\n\nvalue, or null in case of errors\n"]
+    #[doc = "Allocate a Nix value\n@ingroup value_create\nCall nix_value_decref() when you're done with the pointer\n\n# Arguments\n\n* `context` [out]  - Optional, stores error information\n* `state` [in]  - nix evaluator state\n\n# Returns\n\nvalue, or null in case of errors"]
     #[link_name = "\u{1}_nix_alloc_value"]
     pub fn alloc_value(context: *mut c_context, state: *mut EvalState) -> *mut value;
 }
 unsafe extern "C" {
-    #[doc = "Increment the garbage collector reference counter for the given `nix_value`.\nThe Nix language evaluator C API keeps track of alive objects by reference counting.\nWhen you're done with a refcounted pointer, call nix_value_decref().\n\n# Arguments\n\n* `context` [out]  - Optional, stores error information\n* `value` [in]  - The object to keep alive"]
+    #[doc = "Increment the garbage collector reference counter for the given `nix_value`.\n@ingroup value\nThe Nix language evaluator C API keeps track of alive objects by reference counting.\nWhen you're done with a refcounted pointer, call nix_value_decref().\n\n# Arguments\n\n* `context` [out]  - Optional, stores error information\n* `value` [in]  - The object to keep alive"]
     #[link_name = "\u{1}_nix_value_incref"]
     pub fn value_incref(context: *mut c_context, value: *mut value) -> err;
 }
 unsafe extern "C" {
-    #[doc = "Decrement the garbage collector reference counter for the given object\n\n# Arguments\n\n* `context` [out]  - Optional, stores error information\n* `value` [in]  - The object to stop referencing"]
+    #[doc = "Decrement the garbage collector reference counter for the given object\n@ingroup value\nWhen the counter reaches zero, the `nix_value` object becomes invalid.\nThe data referenced by `nix_value` may not be deallocated until the memory\ngarbage collector has run, but deallocation is not guaranteed.\n\n# Arguments\n\n* `context` [out]  - Optional, stores error information\n* `value` [in]  - The object to stop referencing"]
     #[link_name = "\u{1}_nix_value_decref"]
     pub fn value_decref(context: *mut c_context, value: *mut value) -> err;
 }
 unsafe extern "C" {
-    #[doc = "@addtogroup value_manip Manipulating values\nFunctions to inspect and change Nix language values, represented by nix_value.\n/\n/** @anchor getters\n@name Getters\n/\n/**@{*/ /** Get value type\n\n# Arguments\n\n* `context` [out]  - Optional, stores error information\n* `value` [in]  - Nix value to inspect\n\n# Returns\n\ntype of nix value"]
+    #[doc = "Get value type\n@ingroup value_extract\n\n# Arguments\n\n* `context` [out]  - Optional, stores error information\n* `value` [in]  - Nix value to inspect\n\n# Returns\n\ntype of nix value"]
     #[link_name = "\u{1}_nix_get_type"]
     pub fn get_type(context: *mut c_context, value: *const value) -> ValueType;
 }
 unsafe extern "C" {
-    #[doc = "Get type name of value as defined in the evaluator\n\n# Arguments\n\n* `context` [out]  - Optional, stores error information\n* `value` [in]  - Nix value to inspect\n\n# Returns\n\ntype name, owned string\n@todo way to free the result"]
+    #[doc = "Get type name of value as defined in the evaluator\n@ingroup value_extract\n\n# Arguments\n\n* `context` [out]  - Optional, stores error information\n* `value` [in]  - Nix value to inspect\n\n# Returns\n\ntype name string, free with free()"]
     #[link_name = "\u{1}_nix_get_typename"]
     pub fn get_typename(context: *mut c_context, value: *const value)
         -> *const ::core::ffi::c_char;
 }
 unsafe extern "C" {
-    #[doc = "Get boolean value\n\n# Arguments\n\n* `context` [out]  - Optional, stores error information\n* `value` [in]  - Nix value to inspect\n\n# Returns\n\ntrue or false, error info via context"]
+    #[doc = "Get boolean value\n@ingroup value_extract\n\n# Arguments\n\n* `context` [out]  - Optional, stores error information\n* `value` [in]  - Nix value to inspect\n\n# Returns\n\ntrue or false, error info via context"]
     #[link_name = "\u{1}_nix_get_bool"]
     pub fn get_bool(context: *mut c_context, value: *const value) -> bool;
 }
 unsafe extern "C" {
-    #[doc = "Get the raw string\nThis may contain placeholders.\n\n# Arguments\n\n* `context` [out]  - Optional, stores error information\n* `value` [in]  - Nix value to inspect\n* `callback` [in]  - Called with the string value.\n* `user_data` [in]  - optional, arbitrary data, passed to the callback when it's called.\n\n# Returns\n\nstring\nerror code, NIX_OK on success."]
+    #[doc = "Get the raw string\n@ingroup value_extract\nThis may contain placeholders.\n\n# Arguments\n\n* `context` [out]  - Optional, stores error information\n* `value` [in]  - Nix value to inspect\n* `callback` [in]  - Called with the string value.\n* `user_data` [in]  - optional, arbitrary data, passed to the callback when it's called.\n\n# Returns\n\nerror code, NIX_OK on success."]
     #[link_name = "\u{1}_nix_get_string"]
     pub fn get_string(
         context: *mut c_context,
@@ -568,7 +682,7 @@ unsafe extern "C" {
     ) -> err;
 }
 unsafe extern "C" {
-    #[doc = "Get path as string\n\n# Arguments\n\n* `context` [out]  - Optional, stores error information\n* `value` [in]  - Nix value to inspect\n\n# Returns\n\nstring, if the type is NIX_TYPE_PATH\nNULL in case of error."]
+    #[doc = "Get path as string\n@ingroup value_extract\n\n# Arguments\n\n* `context` [out]  - Optional, stores error information\n* `value` [in]  - Nix value to inspect\n\n# Returns\n\nstring valid while value is valid, NULL in case of error"]
     #[link_name = "\u{1}_nix_get_path_string"]
     pub fn get_path_string(
         context: *mut c_context,
@@ -576,32 +690,32 @@ unsafe extern "C" {
     ) -> *const ::core::ffi::c_char;
 }
 unsafe extern "C" {
-    #[doc = "Get the length of a list\n\n# Arguments\n\n* `context` [out]  - Optional, stores error information\n* `value` [in]  - Nix value to inspect\n\n# Returns\n\nlength of list, error info via context"]
+    #[doc = "Get the length of a list\n@ingroup value_extract\n\n# Arguments\n\n* `context` [out]  - Optional, stores error information\n* `value` [in]  - Nix value to inspect\n\n# Returns\n\nlength of list, error info via context"]
     #[link_name = "\u{1}_nix_get_list_size"]
     pub fn get_list_size(context: *mut c_context, value: *const value) -> ::core::ffi::c_uint;
 }
 unsafe extern "C" {
-    #[doc = "Get the element count of an attrset\n\n# Arguments\n\n* `context` [out]  - Optional, stores error information\n* `value` [in]  - Nix value to inspect\n\n# Returns\n\nattrset element count, error info via context"]
+    #[doc = "Get the element count of an attrset\n@ingroup value_extract\n\n# Arguments\n\n* `context` [out]  - Optional, stores error information\n* `value` [in]  - Nix value to inspect\n\n# Returns\n\nattrset element count, error info via context"]
     #[link_name = "\u{1}_nix_get_attrs_size"]
     pub fn get_attrs_size(context: *mut c_context, value: *const value) -> ::core::ffi::c_uint;
 }
 unsafe extern "C" {
-    #[doc = "Get float value in 64 bits\n\n# Arguments\n\n* `context` [out]  - Optional, stores error information\n* `value` [in]  - Nix value to inspect\n\n# Returns\n\nfloat contents, error info via context"]
+    #[doc = "Get float value in 64 bits\n@ingroup value_extract\n\n# Arguments\n\n* `context` [out]  - Optional, stores error information\n* `value` [in]  - Nix value to inspect\n\n# Returns\n\nfloat contents, error info via context"]
     #[link_name = "\u{1}_nix_get_float"]
     pub fn get_float(context: *mut c_context, value: *const value) -> f64;
 }
 unsafe extern "C" {
-    #[doc = "Get int value\n\n# Arguments\n\n* `context` [out]  - Optional, stores error information\n* `value` [in]  - Nix value to inspect\n\n# Returns\n\nint contents, error info via context"]
+    #[doc = "Get int value\n@ingroup value_extract\n\n# Arguments\n\n* `context` [out]  - Optional, stores error information\n* `value` [in]  - Nix value to inspect\n\n# Returns\n\nint contents, error info via context"]
     #[link_name = "\u{1}_nix_get_int"]
     pub fn get_int(context: *mut c_context, value: *const value) -> i64;
 }
 unsafe extern "C" {
-    #[doc = "Get external reference\n\n# Arguments\n\n* `context` [out]  - Optional, stores error information\n* `value` [in]  - Nix value to inspect\n\n# Returns\n\nreference to external, NULL in case of error"]
+    #[doc = "Get external reference\n@ingroup value_extract\n\n# Arguments\n\n* `context` [out]  - Optional, stores error information\n* `value` [in]  - Nix value to inspect\n\n# Returns\n\nreference valid while value is valid. Call nix_gc_incref() if you need it to live longer, then only in that\ncase call nix_gc_decref() when done. NULL in case of error"]
     #[link_name = "\u{1}_nix_get_external"]
     pub fn get_external(context: *mut c_context, value: *mut value) -> *mut ExternalValue;
 }
 unsafe extern "C" {
-    #[doc = "Get the ix'th element of a list\nOwned by the GC. Use nix_gc_decref when you're done with the pointer\n\n# Arguments\n\n* `context` [out]  - Optional, stores error information\n* `value` [in]  - Nix value to inspect\n* `state` [in]  - nix evaluator state\n* `ix` [in]  - list element to get\n\n# Returns\n\nvalue, NULL in case of errors"]
+    #[doc = "Get the ix'th element of a list\n@ingroup value_extract\nCall nix_value_decref() when you're done with the pointer\n\n# Arguments\n\n* `context` [out]  - Optional, stores error information\n* `value` [in]  - Nix value to inspect\n* `state` [in]  - nix evaluator state\n* `ix` [in]  - list element to get\n\n# Returns\n\nvalue, NULL in case of errors"]
     #[link_name = "\u{1}_nix_get_list_byidx"]
     pub fn get_list_byidx(
         context: *mut c_context,
@@ -611,7 +725,7 @@ unsafe extern "C" {
     ) -> *mut value;
 }
 unsafe extern "C" {
-    #[doc = "Get the ix'th element of a list without forcing evaluation of the element\nReturns the list element without forcing its evaluation, allowing access to lazy values.\nThe list value itself must already be evaluated.\nOwned by the GC. Use nix_gc_decref when you're done with the pointer\n\n# Arguments\n\n* `context` [out]  - Optional, stores error information\n* `value` [in]  - Nix value to inspect (must be an evaluated list)\n* `state` [in]  - nix evaluator state\n* `ix` [in]  - list element to get\n\n# Returns\n\nvalue, NULL in case of errors"]
+    #[doc = "Get the ix'th element of a list without forcing evaluation of the element\n@ingroup value_extract\nReturns the list element without forcing its evaluation, allowing access to lazy values.\nThe list value itself must already be evaluated.\nCall nix_value_decref() when you're done with the pointer\n\n# Arguments\n\n* `context` [out]  - Optional, stores error information\n* `value` [in]  - Nix value to inspect (must be an evaluated list)\n* `state` [in]  - nix evaluator state\n* `ix` [in]  - list element to get\n\n# Returns\n\nvalue, NULL in case of errors"]
     #[link_name = "\u{1}_nix_get_list_byidx_lazy"]
     pub fn get_list_byidx_lazy(
         context: *mut c_context,
@@ -621,7 +735,7 @@ unsafe extern "C" {
     ) -> *mut value;
 }
 unsafe extern "C" {
-    #[doc = "Get an attr by name\nUse nix_gc_decref when you're done with the pointer\n\n# Arguments\n\n* `context` [out]  - Optional, stores error information\n* `value` [in]  - Nix value to inspect\n* `state` [in]  - nix evaluator state\n* `name` [in]  - attribute name\n\n# Returns\n\nvalue, NULL in case of errors"]
+    #[doc = "Get an attr by name\n@ingroup value_extract\nCall nix_value_decref() when you're done with the pointer\n\n# Arguments\n\n* `context` [out]  - Optional, stores error information\n* `value` [in]  - Nix value to inspect\n* `state` [in]  - nix evaluator state\n* `name` [in]  - attribute name\n\n# Returns\n\nvalue, NULL in case of errors"]
     #[link_name = "\u{1}_nix_get_attr_byname"]
     pub fn get_attr_byname(
         context: *mut c_context,
@@ -631,7 +745,7 @@ unsafe extern "C" {
     ) -> *mut value;
 }
 unsafe extern "C" {
-    #[doc = "Get an attribute value by attribute name, without forcing evaluation of the attribute's value\nReturns the attribute value without forcing its evaluation, allowing access to lazy values.\nThe attribute set value itself must already be evaluated.\nUse nix_gc_decref when you're done with the pointer\n\n# Arguments\n\n* `context` [out]  - Optional, stores error information\n* `value` [in]  - Nix value to inspect (must be an evaluated attribute set)\n* `state` [in]  - nix evaluator state\n* `name` [in]  - attribute name\n\n# Returns\n\nvalue, NULL in case of errors"]
+    #[doc = "Get an attribute value by attribute name, without forcing evaluation of the attribute's value\n@ingroup value_extract\nReturns the attribute value without forcing its evaluation, allowing access to lazy values.\nThe attribute set value itself must already be evaluated.\nCall nix_value_decref() when you're done with the pointer\n\n# Arguments\n\n* `context` [out]  - Optional, stores error information\n* `value` [in]  - Nix value to inspect (must be an evaluated attribute set)\n* `state` [in]  - nix evaluator state\n* `name` [in]  - attribute name\n\n# Returns\n\nvalue, NULL in case of errors"]
     #[link_name = "\u{1}_nix_get_attr_byname_lazy"]
     pub fn get_attr_byname_lazy(
         context: *mut c_context,
@@ -641,7 +755,7 @@ unsafe extern "C" {
     ) -> *mut value;
 }
 unsafe extern "C" {
-    #[doc = "Check if an attribute name exists on a value\n\n# Arguments\n\n* `context` [out]  - Optional, stores error information\n* `value` [in]  - Nix value to inspect\n* `state` [in]  - nix evaluator state\n* `name` [in]  - attribute name\n\n# Returns\n\nvalue, error info via context"]
+    #[doc = "Check if an attribute name exists on a value\n@ingroup value_extract\n\n# Arguments\n\n* `context` [out]  - Optional, stores error information\n* `value` [in]  - Nix value to inspect\n* `state` [in]  - nix evaluator state\n* `name` [in]  - attribute name\n\n# Returns\n\nvalue, error info via context"]
     #[link_name = "\u{1}_nix_has_attr_byname"]
     pub fn has_attr_byname(
         context: *mut c_context,
@@ -651,7 +765,7 @@ unsafe extern "C" {
     ) -> bool;
 }
 unsafe extern "C" {
-    #[doc = "Get an attribute by index\nAlso gives you the name.\nAttributes are returned in an unspecified order which is NOT suitable for\nreproducible operations. In Nix's domain, reproducibility is paramount. The caller\nis responsible for sorting the attributes or storing them in an ordered map to\nensure deterministic behavior in your application.\n> **Note** When Nix does sort attributes, which it does for virtually all intermediate\noperations and outputs, it uses byte-wise lexicographic order (equivalent to\nlexicographic order by Unicode scalar value for valid UTF-8). We recommend\napplying this same ordering for consistency.\nUse nix_gc_decref when you're done with the pointer\n\n# Arguments\n\n* `context` [out]  - Optional, stores error information\n* `value` [in]  - Nix value to inspect\n* `state` [in]  - nix evaluator state\n* `i` [in]  - attribute index\n* `name` [out]  - will store a pointer to the attribute name\n\n# Returns\n\nvalue, NULL in case of errors"]
+    #[doc = "Get an attribute by index\n@ingroup value_extract\nAlso gives you the name.\nAttributes are returned in an unspecified order which is NOT suitable for\nreproducible operations. In Nix's domain, reproducibility is paramount. The caller\nis responsible for sorting the attributes or storing them in an ordered map to\nensure deterministic behavior in your application.\n> **Note** When Nix does sort attributes, which it does for virtually all intermediate\noperations and outputs, it uses byte-wise lexicographic order (equivalent to\nlexicographic order by Unicode scalar value for valid UTF-8). We recommend\napplying this same ordering for consistency.\nCall nix_value_decref() when you're done with the pointer\n\n# Arguments\n\n* `context` [out]  - Optional, stores error information\n* `value` [in]  - Nix value to inspect\n* `state` [in]  - nix evaluator state\n* `i` [in]  - attribute index\n* `name` [out]  - will store a pointer to the attribute name, valid until state is freed\n\n# Returns\n\nvalue, NULL in case of errors"]
     #[link_name = "\u{1}_nix_get_attr_byidx"]
     pub fn get_attr_byidx(
         context: *mut c_context,
@@ -662,7 +776,7 @@ unsafe extern "C" {
     ) -> *mut value;
 }
 unsafe extern "C" {
-    #[doc = "Get an attribute by index, without forcing evaluation of the attribute's value\nAlso gives you the name.\nReturns the attribute value without forcing its evaluation, allowing access to lazy values.\nThe attribute set value itself must already have been evaluated.\nAttributes are returned in an unspecified order which is NOT suitable for\nreproducible operations. In Nix's domain, reproducibility is paramount. The caller\nis responsible for sorting the attributes or storing them in an ordered map to\nensure deterministic behavior in your application.\n> **Note** When Nix does sort attributes, which it does for virtually all intermediate\noperations and outputs, it uses byte-wise lexicographic order (equivalent to\nlexicographic order by Unicode scalar value for valid UTF-8). We recommend\napplying this same ordering for consistency.\nUse nix_gc_decref when you're done with the pointer\n\n# Arguments\n\n* `context` [out]  - Optional, stores error information\n* `value` [in]  - Nix value to inspect (must be an evaluated attribute set)\n* `state` [in]  - nix evaluator state\n* `i` [in]  - attribute index\n* `name` [out]  - will store a pointer to the attribute name\n\n# Returns\n\nvalue, NULL in case of errors"]
+    #[doc = "Get an attribute by index, without forcing evaluation of the attribute's value\n@ingroup value_extract\nAlso gives you the name.\nReturns the attribute value without forcing its evaluation, allowing access to lazy values.\nThe attribute set value itself must already have been evaluated.\nAttributes are returned in an unspecified order which is NOT suitable for\nreproducible operations. In Nix's domain, reproducibility is paramount. The caller\nis responsible for sorting the attributes or storing them in an ordered map to\nensure deterministic behavior in your application.\n> **Note** When Nix does sort attributes, which it does for virtually all intermediate\noperations and outputs, it uses byte-wise lexicographic order (equivalent to\nlexicographic order by Unicode scalar value for valid UTF-8). We recommend\napplying this same ordering for consistency.\nCall nix_value_decref() when you're done with the pointer\n\n# Arguments\n\n* `context` [out]  - Optional, stores error information\n* `value` [in]  - Nix value to inspect (must be an evaluated attribute set)\n* `state` [in]  - nix evaluator state\n* `i` [in]  - attribute index\n* `name` [out]  - will store a pointer to the attribute name, valid until state is freed\n\n# Returns\n\nvalue, NULL in case of errors"]
     #[link_name = "\u{1}_nix_get_attr_byidx_lazy"]
     pub fn get_attr_byidx_lazy(
         context: *mut c_context,
@@ -673,7 +787,7 @@ unsafe extern "C" {
     ) -> *mut value;
 }
 unsafe extern "C" {
-    #[doc = "Get an attribute name by index\nReturns the attribute name without forcing evaluation of the attribute's value.\nAttributes are returned in an unspecified order which is NOT suitable for\nreproducible operations. In Nix's domain, reproducibility is paramount. The caller\nis responsible for sorting the attributes or storing them in an ordered map to\nensure deterministic behavior in your application.\n> **Note** When Nix does sort attributes, which it does for virtually all intermediate\noperations and outputs, it uses byte-wise lexicographic order (equivalent to\nlexicographic order by Unicode scalar value for valid UTF-8). We recommend\napplying this same ordering for consistency.\nOwned by the nix EvalState\n\n# Arguments\n\n* `context` [out]  - Optional, stores error information\n* `value` [in]  - Nix value to inspect\n* `state` [in]  - nix evaluator state\n* `i` [in]  - attribute index\n\n# Returns\n\nname, NULL in case of errors"]
+    #[doc = "Get an attribute name by index\n@ingroup value_extract\nReturns the attribute name without forcing evaluation of the attribute's value.\nAttributes are returned in an unspecified order which is NOT suitable for\nreproducible operations. In Nix's domain, reproducibility is paramount. The caller\nis responsible for sorting the attributes or storing them in an ordered map to\nensure deterministic behavior in your application.\n> **Note** When Nix does sort attributes, which it does for virtually all intermediate\noperations and outputs, it uses byte-wise lexicographic order (equivalent to\nlexicographic order by Unicode scalar value for valid UTF-8). We recommend\napplying this same ordering for consistency.\n\n# Arguments\n\n* `context` [out]  - Optional, stores error information\n* `value` [in]  - Nix value to inspect\n* `state` [in]  - nix evaluator state\n* `i` [in]  - attribute index\n\n# Returns\n\nname string valid until state is freed, NULL in case of errors"]
     #[link_name = "\u{1}_nix_get_attr_name_byidx"]
     pub fn get_attr_name_byidx(
         context: *mut c_context,
@@ -683,12 +797,12 @@ unsafe extern "C" {
     ) -> *const ::core::ffi::c_char;
 }
 unsafe extern "C" {
-    #[doc = "@}*/ /** @name Initializers\nValues are typically \"returned\" by initializing already allocated memory that serves as the return value.\nFor this reason, the construction of values is not tied their allocation.\nNix is a language with immutable values. Respect this property by only initializing Values once; and only initialize\nValues that are meant to be initialized by you. Failing to adhere to these rules may lead to undefined behavior.\n/\n/**@{*/ /** Set boolean value\n\n# Arguments\n\n* `context` [out]  - Optional, stores error information\n* `value` [out]  - Nix value to modify\n* `b` [in]  - the boolean value\n\n# Returns\n\nerror code, NIX_OK on success."]
+    #[doc = "@name Initializers\nValues are typically \"returned\" by initializing already allocated memory that serves as the return value.\nFor this reason, the construction of values is not tied their allocation.\nNix is a language with immutable values. Respect this property by only initializing Values once; and only initialize\nValues that are meant to be initialized by you. Failing to adhere to these rules may lead to undefined behavior.\n/\n/**@{*/ /** Set boolean value\n@ingroup value_create\n\n# Arguments\n\n* `context` [out]  - Optional, stores error information\n* `value` [out]  - Nix value to modify\n* `b` [in]  - the boolean value\n\n# Returns\n\nerror code, NIX_OK on success."]
     #[link_name = "\u{1}_nix_init_bool"]
     pub fn init_bool(context: *mut c_context, value: *mut value, b: bool) -> err;
 }
 unsafe extern "C" {
-    #[doc = "Set a string\n\n# Arguments\n\n* `context` [out]  - Optional, stores error information\n* `value` [out]  - Nix value to modify\n* `str` [in]  - the string, copied\n\n# Returns\n\nerror code, NIX_OK on success."]
+    #[doc = "Set a string\n@ingroup value_create\n\n# Arguments\n\n* `context` [out]  - Optional, stores error information\n* `value` [out]  - Nix value to modify\n* `str` [in]  - the string, copied\n\n# Returns\n\nerror code, NIX_OK on success."]
     #[link_name = "\u{1}_nix_init_string"]
     pub fn init_string(
         context: *mut c_context,
@@ -697,7 +811,7 @@ unsafe extern "C" {
     ) -> err;
 }
 unsafe extern "C" {
-    #[doc = "Set a path\n\n# Arguments\n\n* `context` [out]  - Optional, stores error information\n* `value` [out]  - Nix value to modify\n* `str` [in]  - the path string, copied\n\n# Returns\n\nerror code, NIX_OK on success."]
+    #[doc = "Set a path\n@ingroup value_create\n\n# Arguments\n\n* `context` [out]  - Optional, stores error information\n* `value` [out]  - Nix value to modify\n* `str` [in]  - the path string, copied\n\n# Returns\n\nerror code, NIX_OK on success."]
     #[link_name = "\u{1}_nix_init_path_string"]
     pub fn init_path_string(
         context: *mut c_context,
@@ -707,22 +821,22 @@ unsafe extern "C" {
     ) -> err;
 }
 unsafe extern "C" {
-    #[doc = "Set a float\n\n# Arguments\n\n* `context` [out]  - Optional, stores error information\n* `value` [out]  - Nix value to modify\n* `d` [in]  - the float, 64-bits\n\n# Returns\n\nerror code, NIX_OK on success."]
+    #[doc = "Set a float\n@ingroup value_create\n\n# Arguments\n\n* `context` [out]  - Optional, stores error information\n* `value` [out]  - Nix value to modify\n* `d` [in]  - the float, 64-bits\n\n# Returns\n\nerror code, NIX_OK on success."]
     #[link_name = "\u{1}_nix_init_float"]
     pub fn init_float(context: *mut c_context, value: *mut value, d: f64) -> err;
 }
 unsafe extern "C" {
-    #[doc = "Set an int\n\n# Arguments\n\n* `context` [out]  - Optional, stores error information\n* `value` [out]  - Nix value to modify\n* `i` [in]  - the int\n\n# Returns\n\nerror code, NIX_OK on success."]
+    #[doc = "Set an int\n@ingroup value_create\n\n# Arguments\n\n* `context` [out]  - Optional, stores error information\n* `value` [out]  - Nix value to modify\n* `i` [in]  - the int\n\n# Returns\n\nerror code, NIX_OK on success."]
     #[link_name = "\u{1}_nix_init_int"]
     pub fn init_int(context: *mut c_context, value: *mut value, i: i64) -> err;
 }
 unsafe extern "C" {
-    #[doc = "Set null\n\n# Arguments\n\n* `context` [out]  - Optional, stores error information\n* `value` [out]  - Nix value to modify\n\n# Returns\n\nerror code, NIX_OK on success."]
+    #[doc = "Set null\n@ingroup value_create\n\n# Arguments\n\n* `context` [out]  - Optional, stores error information\n* `value` [out]  - Nix value to modify\n\n# Returns\n\nerror code, NIX_OK on success."]
     #[link_name = "\u{1}_nix_init_null"]
     pub fn init_null(context: *mut c_context, value: *mut value) -> err;
 }
 unsafe extern "C" {
-    #[doc = "Set the value to a thunk that will perform a function application when needed.\nThunks may be put into attribute sets and lists to perform some computation lazily; on demand.\nHowever, note that in some places, a thunk must not be returned, such as in the return value of a PrimOp.\nIn such cases, you may use nix_value_call() instead (but note the different argument order).\n\n# Arguments\n\n* `context` [out]  - Optional, stores error information\n* `value` [out]  - Nix value to modify\n* `fn` [in]  - function to call\n* `arg` [in]  - argument to pass\n\n# Returns\n\nerror code, NIX_OK on successful initialization.\n\n# See also\n\n> [`nix_value_call()`] for a similar function that performs the call immediately and only stores the return value.\nNote the different argument order."]
+    #[doc = "Set the value to a thunk that will perform a function application when needed.\n@ingroup value_create\nThunks may be put into attribute sets and lists to perform some computation lazily; on demand.\nHowever, note that in some places, a thunk must not be returned, such as in the return value of a PrimOp.\nIn such cases, you may use nix_value_call() instead (but note the different argument order).\n\n# Arguments\n\n* `context` [out]  - Optional, stores error information\n* `value` [out]  - Nix value to modify\n* `fn` [in]  - function to call\n* `arg` [in]  - argument to pass\n\n# Returns\n\nerror code, NIX_OK on successful initialization.\n\n# See also\n\n> [`nix_value_call()`] for a similar function that performs the call immediately and only stores the return value.\nNote the different argument order."]
     #[link_name = "\u{1}_nix_init_apply"]
     pub fn init_apply(
         context: *mut c_context,
@@ -732,7 +846,7 @@ unsafe extern "C" {
     ) -> err;
 }
 unsafe extern "C" {
-    #[doc = "Set an external value\n\n# Arguments\n\n* `context` [out]  - Optional, stores error information\n* `value` [out]  - Nix value to modify\n* `val` [in]  - the external value to set. Will be GC-referenced by the value.\n\n# Returns\n\nerror code, NIX_OK on success."]
+    #[doc = "Set an external value\n@ingroup value_create\n\n# Arguments\n\n* `context` [out]  - Optional, stores error information\n* `value` [out]  - Nix value to modify\n* `val` [in]  - the external value to set. Will be GC-referenced by the value.\n\n# Returns\n\nerror code, NIX_OK on success."]
     #[link_name = "\u{1}_nix_init_external"]
     pub fn init_external(
         context: *mut c_context,
@@ -741,7 +855,7 @@ unsafe extern "C" {
     ) -> err;
 }
 unsafe extern "C" {
-    #[doc = "Create a list from a list builder\n\n# Arguments\n\n* `context` [out]  - Optional, stores error information\n* `list_builder` [in]  - list builder to use. Make sure to unref this afterwards.\n* `value` [out]  - Nix value to modify\n\n# Returns\n\nerror code, NIX_OK on success."]
+    #[doc = "Create a list from a list builder\n@ingroup value_create\nAfter this call, the list builder becomes invalid and cannot be used again.\nThe only necessary next step is to free it with nix_list_builder_free().\n\n# Arguments\n\n* `context` [out]  - Optional, stores error information\n* `list_builder` [in]  - list builder to use\n* `value` [out]  - Nix value to modify\n\n# Returns\n\nerror code, NIX_OK on success.\n\n# See also\n\n> [`nix_list_builder_free`]"]
     #[link_name = "\u{1}_nix_make_list"]
     pub fn make_list(
         context: *mut c_context,
@@ -750,7 +864,7 @@ unsafe extern "C" {
     ) -> err;
 }
 unsafe extern "C" {
-    #[doc = "Create a list builder\n\n# Arguments\n\n* `context` [out]  - Optional, stores error information\n* `state` [in]  - nix evaluator state\n* `capacity` [in]  - how many bindings you'll add. Don't exceed.\n\n# Returns\n\nowned reference to a list builder. Make sure to unref when you're done."]
+    #[doc = "Create a list builder\n@ingroup value_create\n\n# Arguments\n\n* `context` [out]  - Optional, stores error information\n* `state` [in]  - nix evaluator state\n* `capacity` [in]  - how many bindings you'll add. Don't exceed.\n\n# Returns\n\nlist builder. Call nix_list_builder_free() when you're done."]
     #[link_name = "\u{1}_nix_make_list_builder"]
     pub fn make_list_builder(
         context: *mut c_context,
@@ -774,22 +888,22 @@ unsafe extern "C" {
     pub fn list_builder_free(list_builder: *mut ListBuilder);
 }
 unsafe extern "C" {
-    #[doc = "Create an attribute set from a bindings builder\n\n# Arguments\n\n* `context` [out]  - Optional, stores error information\n* `value` [out]  - Nix value to modify\n* `b` [in]  - bindings builder to use. Make sure to unref this afterwards.\n\n# Returns\n\nerror code, NIX_OK on success."]
+    #[doc = "Create an attribute set from a bindings builder\n@ingroup value_create\nAfter this call, the bindings builder becomes invalid and cannot be used again.\nThe only necessary next step is to free it with nix_bindings_builder_free().\n\n# Arguments\n\n* `context` [out]  - Optional, stores error information\n* `value` [out]  - Nix value to modify\n* `b` [in]  - bindings builder to use\n\n# Returns\n\nerror code, NIX_OK on success.\n\n# See also\n\n> [`nix_bindings_builder_free`]"]
     #[link_name = "\u{1}_nix_make_attrs"]
     pub fn make_attrs(context: *mut c_context, value: *mut value, b: *mut BindingsBuilder) -> err;
 }
 unsafe extern "C" {
-    #[doc = "Set primop\n\n# Arguments\n\n* `context` [out]  - Optional, stores error information\n* `value` [out]  - Nix value to modify\n* `op` [in]  - primop, will be gc-referenced by the value\n\n# See also\n\n> [`nix_alloc_primop`]\n\n# Returns\n\nerror code, NIX_OK on success."]
+    #[doc = "Set primop\n@ingroup value_create\n\n# Arguments\n\n* `context` [out]  - Optional, stores error information\n* `value` [out]  - Nix value to modify\n* `op` [in]  - primop, will be gc-referenced by the value\n\n# See also\n\n> [`nix_alloc_primop`]\n\n# Returns\n\nerror code, NIX_OK on success."]
     #[link_name = "\u{1}_nix_init_primop"]
     pub fn init_primop(context: *mut c_context, value: *mut value, op: *mut PrimOp) -> err;
 }
 unsafe extern "C" {
-    #[doc = "Copy from another value\n\n# Arguments\n\n* `context` [out]  - Optional, stores error information\n* `value` [out]  - Nix value to modify\n* `source` [in]  - value to copy from\n\n# Returns\n\nerror code, NIX_OK on success."]
+    #[doc = "Copy from another value\n@ingroup value_create\n\n# Arguments\n\n* `context` [out]  - Optional, stores error information\n* `value` [out]  - Nix value to modify\n* `source` [in]  - value to copy from\n\n# Returns\n\nerror code, NIX_OK on success."]
     #[link_name = "\u{1}_nix_copy_value"]
     pub fn copy_value(context: *mut c_context, value: *mut value, source: *const value) -> err;
 }
 unsafe extern "C" {
-    #[doc = "Create a bindings builder\n\n# Arguments\n\n* `context` [out]  - Optional, stores error information\n* `state` [in]  - nix evaluator state\n* `capacity` [in]  - how many bindings you'll add. Don't exceed.\n\n# Returns\n\nowned reference to a bindings builder. Make sure to unref when you're\ndone."]
+    #[doc = "Create a bindings builder\n\n# Arguments\n\n* `context` [out]  - Optional, stores error information\n* `state` [in]  - nix evaluator state\n* `capacity` [in]  - how many bindings you'll add. Don't exceed.\n\n# Returns\n\nbindings builder. Call nix_bindings_builder_free() when you're done."]
     #[link_name = "\u{1}_nix_make_bindings_builder"]
     pub fn make_bindings_builder(
         context: *mut c_context,
@@ -813,7 +927,7 @@ unsafe extern "C" {
     pub fn bindings_builder_free(builder: *mut BindingsBuilder);
 }
 unsafe extern "C" {
-    #[doc = "Realise a string context.\nThis will\n- realise the store paths referenced by the string's context, and\n- perform the replacement of placeholders.\n- create temporary garbage collection roots for the store paths, for\nthe lifetime of the current process.\n- log to stderr\n\n# Arguments\n\n* `context` [out]  - Optional, stores error information\n* `value` [in]  - Nix value, which must be a string\n* `state` [in]  - Nix evaluator state\n* `isIFD` [in]  - If true, disallow derivation outputs if setting `allow-import-from-derivation` is false.\nYou should set this to true when this call is part of a primop.\nYou should set this to false when building for your application's purpose.\n\n# Returns\n\nNULL if failed, are a new nix_realised_string, which must be freed with nix_realised_string_free"]
+    #[doc = "Realise a string context.\nThis will\n- realise the store paths referenced by the string's context, and\n- perform the replacement of placeholders.\n- create temporary garbage collection roots for the store paths, for\nthe lifetime of the current process.\n- log to stderr\n\n# Arguments\n\n* `context` [out]  - Optional, stores error information\n* `value` [in]  - Nix value, which must be a string\n* `state` [in]  - Nix evaluator state\n* `isIFD` [in]  - If true, disallow derivation outputs if setting `allow-import-from-derivation` is false.\nYou should set this to true when this call is part of a primop.\nYou should set this to false when building for your application's purpose.\n\n# Returns\n\nNULL if failed, or a new nix_realised_string, which must be freed with nix_realised_string_free"]
     #[link_name = "\u{1}_nix_string_realise"]
     pub fn string_realise(
         context: *mut c_context,
@@ -823,7 +937,7 @@ unsafe extern "C" {
     ) -> *mut realised_string;
 }
 unsafe extern "C" {
-    #[doc = "Start of the string\n\n# Arguments\n\n* `realised_string` [in]  -\n\n# Returns\n\npointer to the start of the string. It may not be null-terminated."]
+    #[doc = "Start of the string\n\n# Arguments\n\n* `realised_string` [in]  -\n\n# Returns\n\npointer to the start of the string, valid until realised_string is freed. It may not be null-terminated."]
     #[link_name = "\u{1}_nix_realised_string_get_buffer_start"]
     pub fn realised_string_get_buffer_start(
         realised_string: *mut realised_string,
@@ -840,7 +954,7 @@ unsafe extern "C" {
     pub fn realised_string_get_store_path_count(realised_string: *mut realised_string) -> usize;
 }
 unsafe extern "C" {
-    #[doc = "Get a store path. The store paths are stored in an arbitrary order.\n\n# Arguments\n\n* `realised_string` [in]  -\n* `index` [in]  - index of the store path, must be less than the count\n\n# Returns\n\nstore path"]
+    #[doc = "Get a store path. The store paths are stored in an arbitrary order.\n\n# Arguments\n\n* `realised_string` [in]  -\n* `index` [in]  - index of the store path, must be less than the count\n\n# Returns\n\nstore path valid until realised_string is freed"]
     #[link_name = "\u{1}_nix_realised_string_get_store_path"]
     pub fn realised_string_get_store_path(
         realised_string: *mut realised_string,
@@ -916,7 +1030,7 @@ pub struct NixCExternalValueDesc {
             res: *mut string_return,
         ),
     >,
-    #[doc = "Try to compare two external values\nOptional, the default is always false.\nIf the other object was not a Nix C external value, this comparison will\nalso return false\n\n# Arguments\n\n* `self` [in]  - the void* passed to nix_create_external_value\n* `other` [in]  - the void* passed to the other object's\nnix_create_external_value\n\n# Returns\n\ntrue if the objects are deemed to be equal"]
+    #[doc = "Try to compare two external values\nOptional, the default is always false.\nIf the other object was not a Nix C API external value, this comparison will\nalso return false\n\n# Arguments\n\n* `self` [in]  - the void* passed to nix_create_external_value\n* `other` [in]  - the void* passed to the other object's\nnix_create_external_value\n\n# Returns\n\ntrue if the objects are deemed to be equal"]
     pub equal: ::core::option::Option<
         unsafe extern "C" fn(
             self_: *mut ::core::ffi::c_void,
@@ -934,7 +1048,7 @@ pub struct NixCExternalValueDesc {
             res: *mut string_return,
         ),
     >,
-    #[doc = "Convert the external value to XML\nOptional, the default is to throw an error\n@todo The mechanisms for this call are incomplete. There are no C\nbindings to work with XML, pathsets and positions.\n\n# Arguments\n\n* `self` [in]  - the void* passed to nix_create_external_value\n* `state` [in]  - The evaluator state\n* `strict` [in]  - boolean Whether to force the value before printing\n* `location` [in]  - boolean Whether to include position information in the\nxml\n* `doc` [out]  - XML document to output to\n* `c` [out]  - writable string context for the resulting string\n* `drvsSeen` [in,out]  - a path set to avoid duplicating derivations\n* `pos` [in]  - The position of the call."]
+    #[doc = "Convert the external value to XML\nOptional, the default is to throw an error\n@todo The mechanisms for this call are incomplete. There are no C\nbindings to work with XML, pathsets and positions.\nThis callback also has no test coverage.\n\n# Arguments\n\n* `self` [in]  - the void* passed to nix_create_external_value\n* `state` [in]  - The evaluator state\n* `strict` [in]  - boolean Whether to force the value before printing\n* `location` [in]  - boolean Whether to include position information in the\nxml\n* `doc` [out]  - XML document to output to\n* `c` [out]  - writable string context for the resulting string\n* `drvsSeen` [in,out]  - a path set to avoid duplicating derivations\n* `pos` [in]  - The position of the call."]
     pub printValueAsXML: ::core::option::Option<
         unsafe extern "C" fn(
             self_: *mut ::core::ffi::c_void,
@@ -969,7 +1083,7 @@ const _: () = {
         [::core::mem::offset_of!(NixCExternalValueDesc, printValueAsXML) - 48usize];
 };
 unsafe extern "C" {
-    #[doc = "Create an external value, that can be given to nix_init_external\nOwned by the GC. Use nix_gc_decref when you're done with the pointer.\n\n# Arguments\n\n* `context` [out]  - Optional, stores error information\n* `desc` [in]  - a NixCExternalValueDesc, you should keep this alive as long\nas the ExternalValue lives\n* `v` [in]  - the value to store\n\n# Returns\n\nexternal value, owned by the garbage collector\n\n# See also\n\n> [`nix_init_external`]"]
+    #[doc = "Create an external value, that can be given to nix_init_external\nCall nix_gc_decref() when you're done with the pointer.\n\n# Arguments\n\n* `context` [out]  - Optional, stores error information\n* `desc` [in]  - a NixCExternalValueDesc, you should keep this alive as long\nas the ExternalValue lives\n* `v` [in]  - the value to store\n\n# Returns\n\nexternal value, owned by the garbage collector\n\n# See also\n\n> [`nix_init_external`]"]
     #[link_name = "\u{1}_nix_create_external_value"]
     pub fn create_external_value(
         context: *mut c_context,
@@ -978,7 +1092,7 @@ unsafe extern "C" {
     ) -> *mut ExternalValue;
 }
 unsafe extern "C" {
-    #[doc = "Extract the pointer from a nix c external value.\n\n# Arguments\n\n* `context` [out]  - Optional, stores error information\n* `b` [in]  - The external value\n\n# Returns\n\nThe pointer, or null if the external value was not from nix c.\n\n# See also\n\n> [`nix_get_external`]"]
+    #[doc = "Extract the pointer from a Nix C API external value.\n\n# Arguments\n\n* `context` [out]  - Optional, stores error information\n* `b` [in]  - The external value\n\n# Returns\n\nThe pointer, valid while the external value is valid, or null if the external value was not from the Nix C\nAPI.\n\n# See also\n\n> [`nix_get_external`]"]
     #[link_name = "\u{1}_nix_get_external_value_content"]
     pub fn get_external_value_content(
         context: *mut c_context,
@@ -1103,7 +1217,7 @@ unsafe extern "C" {
     ) -> err;
 }
 unsafe extern "C" {
-    #[doc = "Add input overrides to the lock flags\n\n# Arguments\n\n* `context` [out]  - Optional, stores error information\n* `flags` [in]  - The flags to modify\n* `inputPath` [in]  - The input path to override\n* `flakeRef` [in]  - The flake reference to use as the override\nThis switches the `flags` to `nix_flake_lock_flags_set_mode_virtual` if not in mode\n`nix_flake_lock_flags_set_mode_check`."]
+    #[doc = "Add input overrides to the lock flags\n\n# Arguments\n\n* `context` [out]  - Optional, stores error information\n* `flags` [in]  - The flags to modify\n* `inputPath` [in]  - The input path to override (must not be empty)\n* `flakeRef` [in]  - The flake reference to use as the override\n\n# Returns\n\nNIX_ERR_NIX_ERROR if inputPath is empty\nThis switches the `flags` to `nix_flake_lock_flags_set_mode_virtual` if not in mode\n`nix_flake_lock_flags_set_mode_check`."]
     #[link_name = "\u{1}_nix_flake_lock_flags_add_input_override"]
     pub fn flake_lock_flags_add_input_override(
         context: *mut c_context,

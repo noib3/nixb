@@ -61,13 +61,7 @@ struct ExprRustLambda : nix::ExprLambda {
 
   ExprRustLambda(RustFunctionData *shared_, size_t argc_,
                  const nix::Value *const *args_)
-      : nix::ExprLambda(
-#ifdef NIX_2_32
-            nix::noPos, shared_->arg_names[argc_], nullptr, this
-#else
-            nix::noPos, shared_->arg_names[argc_], this
-#endif
-            ),
+      : nix::ExprLambda(nix::noPos, shared_->arg_names[argc_], this),
         shared(shared_), argc(argc_) {
     // Function name for stack traces.
     this->name = shared->func_name;

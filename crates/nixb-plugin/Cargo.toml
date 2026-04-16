@@ -7,9 +7,9 @@ license.workspace = true
 
 [features]
 dlopen = ["std", "dep:libc", "dep:libloading", "dep:memchr", "dep:rusqlite"]
-nix-2-32 = ["nixb-expr/nix-2-32", "nixb-sys/nix-2-32"]
-nix-2-33 = ["nix-2-32", "nixb-expr/nix-2-33", "nixb-sys/nix-2-33"]
+nix-2-33 = ["nixb-expr/nix-2-33", "nixb-sys/nix-2-33"]
 nix-2-34 = ["nix-2-33", "nixb-expr/nix-2-34", "nixb-sys/nix-2-34"]
+nix-2-35 = ["nix-2-34", "nixb-expr/nix-2-35", "nixb-sys/nix-2-35"]
 std = []
 
 [dependencies]

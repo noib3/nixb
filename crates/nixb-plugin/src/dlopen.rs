@@ -22,16 +22,42 @@
 use core::fmt::Write;
 use core::ops::ControlFlow;
 use core::{fmt, mem};
+use std::collections::HashMap;
 use std::env;
 use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
 
-const DYLIBS: [(&str, &str); 4] = [
-    ("nix-util-c", "nixutilc"),
-    ("nix-store-c", "nixstorec"),
-    ("nix-expr-c", "nixexprc"),
-    ("nix-flake-c", "nixflakec"),
+use rusqlite::OptionalExtension;
+
+const DYLIBS: [Dylib; 4] = [
+    Dylib { package: "nix-util-c", lib_name: "nixutilc", refs: &["nix-util"] },
+    Dylib {
+        package: "nix-store-c",
+        lib_name: "nixstorec",
+        refs: &["nix-util", "nix-store"],
+    },
+    Dylib {
+        package: "nix-expr-c",
+        lib_name: "nixexprc",
+        refs: &["nix-util", "nix-store", "nix-expr"],
+    },
+    Dylib {
+        package: "nix-flake-c",
+        lib_name: "nixflakec",
+        refs: &["nix-expr", "nix-flake"],
+    },
 ];
+
+const LOADED_NIX_DYLIBS: [(&str, &str); 5] = [
+    ("nix-main", "-nix-main-"),
+    ("nix-util", "-nix-util-"),
+    ("nix-store", "-nix-store-"),
+    ("nix-expr", "-nix-expr-"),
+    ("nix-flake", "-nix-flake-"),
+];
+
+const RUNTIME_REF_PACKAGES: [&str; 4] =
+    ["nix-util", "nix-store", "nix-expr", "nix-flake"];
 
 const NIX_DB_PATH: &str = "/nix/var/nix/db/db.sqlite";
 
@@ -44,11 +70,32 @@ const TARGET_NIX_VERSION: &str = {
     {
         "2.33"
     }
-    #[cfg(feature = "nix-2-34")]
+    #[cfg(all(feature = "nix-2-34", not(feature = "nix-2-35")))]
     {
         "2.34"
     }
+    #[cfg(feature = "nix-2-35")]
+    {
+        "2.35"
+    }
 };
+
+struct Dylib {
+    package: &'static str,
+    lib_name: &'static str,
+    refs: &'static [&'static str],
+}
+
+struct LoadedNixDylib {
+    package: &'static str,
+    store_path: String,
+    version: String,
+}
+
+struct LoadedNixRuntime {
+    version: String,
+    store_paths: HashMap<&'static str, String>,
+}
 
 #[inline]
 #[track_caller]
@@ -62,11 +109,11 @@ pub(crate) fn open() {
 }
 
 fn open_impl() -> Result<(), DyLibOpenError> {
-    let nix_version = loaded_nix_version()?;
+    let loaded_nix = loaded_nix_runtime()?;
 
-    if !nix_version.starts_with(TARGET_NIX_VERSION) {
+    if !loaded_nix.version.starts_with(TARGET_NIX_VERSION) {
         return Err(DyLibOpenError::NixVersionMismatch {
-            loaded_version: nix_version,
+            loaded_version: loaded_nix.version,
         });
     }
 
@@ -86,34 +133,81 @@ fn open_impl() -> Result<(), DyLibOpenError> {
         .prepare("SELECT path FROM ValidPaths WHERE path LIKE '%' || ?1")
         .map_err(DyLibOpenError::QueryNixDb)?;
 
+    let mut ref_stmt = connection
+        .prepare(
+            "SELECT 1 FROM Refs refs JOIN ValidPaths referrer ON referrer.id \
+             = refs.referrer JOIN ValidPaths reference ON reference.id = \
+             refs.reference WHERE referrer.path = ?1 AND reference.path = ?2 \
+             LIMIT 1",
+        )
+        .map_err(DyLibOpenError::QueryNixDb)?;
+
     let mut lib_filename = String::new();
     let mut store_suffix = String::new();
 
-    for (pkg, lib_name) in DYLIBS {
-        write!(&mut store_suffix, "-{pkg}-{nix_version}").expect("cannot fail");
+    for dylib in DYLIBS {
+        write!(&mut store_suffix, "-{}-{}", dylib.package, loaded_nix.version)
+            .expect("cannot fail");
 
-        let Some(first_row) = stmt
+        let expected_refs = dylib
+            .refs
+            .iter()
+            .map(|pkg| {
+                loaded_nix.store_paths.get(pkg).cloned().ok_or_else(|| {
+                    DyLibOpenError::LoadedDyLibNotFound {
+                        pkg: (*pkg).to_owned(),
+                        version: loaded_nix.version.clone(),
+                    }
+                })
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+
+        let candidates = stmt
             .query_map(rusqlite::params![store_suffix], |row| {
                 row.get::<_, String>(0)
             })
-            .map_err(DyLibOpenError::QueryNixDb)?
-            .next()
-        else {
-            return Err(DyLibOpenError::StoreOutputNotFound {
-                pkg: pkg.to_owned(),
-                version: nix_version,
+            .map_err(DyLibOpenError::QueryNixDb)?;
+
+        let mut store_path = None;
+
+        'candidate: for candidate in candidates {
+            let candidate = candidate.map_err(DyLibOpenError::QueryNixDb)?;
+
+            for expected_ref in &expected_refs {
+                let has_ref = ref_stmt
+                    .query_row(
+                        rusqlite::params![candidate, expected_ref],
+                        |_| Ok(()),
+                    )
+                    .optional()
+                    .map_err(DyLibOpenError::QueryNixDb)?
+                    .is_some();
+
+                if !has_ref {
+                    continue 'candidate;
+                }
+            }
+
+            store_path = Some(candidate);
+            break;
+        }
+
+        let Some(store_path) = store_path else {
+            return Err(DyLibOpenError::StoreOutputVariantNotFound {
+                pkg: dylib.package.to_owned(),
+                version: loaded_nix.version.clone(),
+                refs: expected_refs,
             });
         };
 
         write!(
             &mut lib_filename,
-            "{}{lib_name}{}",
+            "{}{}{}",
             env::consts::DLL_PREFIX,
+            dylib.lib_name,
             env::consts::DLL_SUFFIX,
         )
         .expect("cannot fail");
-
-        let store_path = first_row.map_err(DyLibOpenError::QueryNixDb)?;
 
         let lib_path = Path::new(&store_path).join("lib").join(&lib_filename);
 
@@ -140,57 +234,122 @@ fn open_impl() -> Result<(), DyLibOpenError> {
     Ok(())
 }
 
-fn loaded_nix_version() -> Result<String, DyLibOpenError> {
-    let markers = [
-        "-nix-expr-",
-        "-nix-util-",
-        "-nix-store-",
-        "-nix-flake-",
-        "-nix-main-",
-    ];
+fn loaded_nix_runtime() -> Result<LoadedNixRuntime, DyLibOpenError> {
+    let mut loaded_dylibs = Vec::new();
 
     platform::loaded_image_paths(|lib_path| {
-        // We look for library paths of the form:
-        //   /nix/store/<hash><marker><version>/lib/..
-        for marker in markers {
-            let Some(marker_start) =
-                memchr::memmem::find(lib_path.to_bytes(), marker.as_bytes())
-            else {
-                continue;
-            };
-
-            let version_start = marker_start + marker.len();
-
-            let Some(version_len) =
-                memchr::memchr(b'/', &lib_path.to_bytes()[version_start..])
-            else {
-                continue;
-            };
-
-            let Ok(version_str) = str::from_utf8(
-                &lib_path.to_bytes()
-                    [version_start..version_start + version_len],
-            ) else {
-                continue;
-            };
-
-            return ControlFlow::Break(version_str.to_owned());
+        if let Some(parsed) = parse_loaded_nix_dylib(lib_path) {
+            loaded_dylibs.push(parsed);
         }
 
-        ControlFlow::Continue(())
-    })
-    .ok_or(DyLibOpenError::UnknownNixVersion)
+        ControlFlow::<()>::Continue(())
+    });
+
+    let version = loaded_dylibs
+        .iter()
+        .rev()
+        .find_map(|dylib| {
+            (dylib.package == "nix-main"
+                && dylib.version.starts_with(TARGET_NIX_VERSION))
+            .then(|| dylib.version.clone())
+        })
+        .or_else(|| {
+            loaded_dylibs.iter().rev().find_map(|dylib| {
+                dylib
+                    .version
+                    .starts_with(TARGET_NIX_VERSION)
+                    .then(|| dylib.version.clone())
+            })
+        })
+        .ok_or(DyLibOpenError::UnknownNixVersion)?;
+
+    let store_paths = loaded_dylibs
+        .into_iter()
+        .filter(|dylib| {
+            dylib.version == version
+                && RUNTIME_REF_PACKAGES.contains(&dylib.package)
+        })
+        .map(|dylib| (dylib.package, dylib.store_path))
+        .collect::<HashMap<_, _>>();
+
+    for pkg in RUNTIME_REF_PACKAGES {
+        if !store_paths.contains_key(pkg) {
+            return Err(DyLibOpenError::LoadedDyLibNotFound {
+                pkg: pkg.to_owned(),
+                version: version.clone(),
+            });
+        }
+    }
+
+    Ok(LoadedNixRuntime { version, store_paths })
+}
+
+fn parse_loaded_nix_dylib(lib_path: &std::ffi::CStr) -> Option<LoadedNixDylib> {
+    let lib_path = lib_path.to_bytes();
+
+    // We look for library paths of the form:
+    //   /nix/store/<hash><marker><version>/lib/..
+    for (package, marker) in LOADED_NIX_DYLIBS {
+        let Some(marker_start) =
+            memchr::memmem::find(lib_path, marker.as_bytes())
+        else {
+            continue;
+        };
+
+        let version_start = marker_start + marker.len();
+
+        let Some(version_len) =
+            memchr::memchr(b'/', &lib_path[version_start..])
+        else {
+            continue;
+        };
+
+        let Ok(version) = str::from_utf8(
+            &lib_path[version_start..version_start + version_len],
+        ) else {
+            continue;
+        };
+
+        let Ok(store_path) =
+            str::from_utf8(&lib_path[..version_start + version_len])
+        else {
+            continue;
+        };
+
+        return Some(LoadedNixDylib {
+            package,
+            store_path: store_path.to_owned(),
+            version: version.to_owned(),
+        });
+    }
+
+    None
 }
 
 #[derive(Debug)]
 enum DyLibOpenError {
-    DyLibNotFound { lib_path: PathBuf },
-    LoadDyLib { lib_path: PathBuf, err: libloading::Error },
+    DyLibNotFound {
+        lib_path: PathBuf,
+    },
+    LoadedDyLibNotFound {
+        pkg: String,
+        version: String,
+    },
+    LoadDyLib {
+        lib_path: PathBuf,
+        err: libloading::Error,
+    },
     NixDbNotFound,
-    NixVersionMismatch { loaded_version: String },
+    NixVersionMismatch {
+        loaded_version: String,
+    },
     OpenNixDb(rusqlite::Error),
     QueryNixDb(rusqlite::Error),
-    StoreOutputNotFound { pkg: String, version: String },
+    StoreOutputVariantNotFound {
+        pkg: String,
+        version: String,
+        refs: Vec<String>,
+    },
     UnknownNixVersion,
 }
 
@@ -202,6 +361,13 @@ impl fmt::Display for DyLibOpenError {
                     f,
                     "couldn't find a shared library at {}",
                     lib_path.display()
+                )
+            },
+            Self::LoadedDyLibNotFound { pkg, version } => {
+                write!(
+                    f,
+                    "couldn't find the already-loaded {pkg}-{version} runtime \
+                     dylib"
                 )
             },
             Self::LoadDyLib { lib_path: dylib_path, err } => {
@@ -227,11 +393,12 @@ impl fmt::Display for DyLibOpenError {
             Self::QueryNixDb(err) => {
                 write!(f, "couldn't query Nix DB at {NIX_DB_PATH}: {err}")
             },
-            Self::StoreOutputNotFound { pkg, version } => {
+            Self::StoreOutputVariantNotFound { pkg, version, refs } => {
                 write!(
                     f,
                     "couldn't find /nix/store output for {pkg}-{version} in \
-                     the Nix DB"
+                     the Nix DB that references {}",
+                    refs.join(", ")
                 )
             },
             Self::UnknownNixVersion => {

@@ -6,9 +6,9 @@ authors.workspace = true
 license.workspace = true
 
 [features]
-nix-2-32 = ["nixb-cpp/nix-2-32", "nixb-sys/nix-2-32"]
-nix-2-33 = ["nix-2-32", "nixb-cpp/nix-2-33", "nixb-sys/nix-2-33"]
+nix-2-33 = ["nixb-cpp/nix-2-33", "nixb-sys/nix-2-33"]
 nix-2-34 = ["nix-2-33", "nixb-cpp/nix-2-34", "nixb-sys/nix-2-34"]
+nix-2-35 = ["nix-2-34", "nixb-cpp/nix-2-35", "nixb-sys/nix-2-35"]
 
 compact_str = ["dep:compact_str"]
 either = ["dep:either"]

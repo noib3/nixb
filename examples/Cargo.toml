@@ -9,9 +9,9 @@ license.workspace = true
 [features]
 default = ["dlopen", "nix-2-34"]
 dlopen = ["nixb/dlopen"]
-nix-2-32 = ["nixb/nix-2-32"]
 nix-2-33 = ["nixb/nix-2-33"]
 nix-2-34 = ["nixb/nix-2-34"]
+nix-2-35 = ["nixb/nix-2-35"]
 
 [dependencies]
 nixb = { workspace = true, features = ["expr", "plugin"] }

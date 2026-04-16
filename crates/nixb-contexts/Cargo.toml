@@ -7,9 +7,9 @@ license.workspace = true
 
 [features]
 c = ["dep:nixb-sys"]
-nix-2-32 = ["nixb-sys?/nix-2-32"]
-nix-2-33 = ["nix-2-32", "nixb-sys?/nix-2-33"]
+nix-2-33 = ["nixb-sys?/nix-2-33"]
 nix-2-34 = ["nix-2-33", "nixb-sys?/nix-2-34"]
+nix-2-35 = ["nix-2-34", "nixb-sys?/nix-2-35"]
 
 [dependencies]
 nixb-result = { workspace = true }
