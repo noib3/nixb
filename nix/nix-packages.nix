@@ -1,9 +1,9 @@
 {
   fetchFromGitHub,
-  fetchpatch,
   generateSplicesForMkScope,
   lib,
   nixDependencies,
+  zstd,
   # --,
   nixpkgs,
 }:
@@ -14,17 +14,11 @@ let
     lib.teams.security-review
   ];
 
-  lowdown30Patch = fetchpatch {
-    name = "nix-lowdown-3.0-support.patch";
-    url = "https://github.com/NixOS/nix/commit/472c35c561bd9e8db1465e0677f1efe2cb88c568.patch";
-    hash = "sha256-ZCQgI/euBN8t9rgdCsGRgrcEWG3T5MUc+bQc4tIcHuI=";
-  };
-
   mkNixPackage =
     nixSourceKey: nixSource:
     let
-      nixComponents =
-        (nixDependencies.callPackage
+      nixComponentsBase =
+        nixDependencies.callPackage
           "${nixpkgs}/pkgs/tools/package-management/nix/modular/packages.nix"
           {
             inherit teams;
@@ -34,18 +28,17 @@ let
             ];
             src = nixSource;
             version = nixSource.rev;
-          }
-        ).appendPatches
-          (
-            lib.optionals
-              (builtins.elem nixSourceKey [
-                "2_32"
-                "2_33"
-              ])
-              [
-                lowdown30Patch
-              ]
-          );
+          };
+
+      nixComponents = nixComponentsBase.overrideScope (
+        _finalScope: prevScope: {
+          nix-util = prevScope.nix-util.overrideAttrs (prevAttrs: {
+            buildInputs =
+              (prevAttrs.buildInputs or [ ])
+              ++ lib.optionals (nixSourceKey == "2_35") [ zstd ];
+          });
+        }
+      );
     in
     nixComponents.nix-everything.overrideAttrs {
       doCheck = false;

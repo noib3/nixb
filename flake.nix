@@ -63,6 +63,38 @@
         pkgs.callPackage ./nix/nix-packages.nix {
           inherit nixpkgs;
         };
+
+      mkNixSources =
+        pkgs: import ./nix/nix-sources.nix { inherit (pkgs) fetchFromGitHub; };
+
+      mkShell =
+        pkgs: nixPackage:
+        pkgs.mkShell {
+          packages = [
+            (pkgs.lib.getBin nixPackage)
+          ];
+          buildInputs = [
+            (pkgs.lib.getDev nixPackage)
+          ];
+          nativeBuildInputs = [
+            pkgs.pkg-config
+            (pkgs.rustfmt.override { asNightly = true; })
+            ((mkRustToolchain pkgs).override {
+              extensions = [
+                "clippy"
+                "rust-analyzer"
+                "rust-src"
+              ];
+            })
+          ];
+          env = {
+            # This silences a warning emitted by the build script of the
+            # nixb-cpp crate. See
+            # https://github.com/NixOS/nixpkgs/issues/395191 and
+            # https://github.com/NixOS/nixpkgs/pull/396373 for details.
+            NIX_CC_WRAPPER_SUPPRESS_TARGET_WARNING = "1";
+          };
+        };
     in
     {
       packages = forEachSystem (
@@ -119,30 +151,17 @@
       );
 
       devShells = forEachSystem (
-        system: pkgs: {
-          default = pkgs.mkShell {
-            buildInputs = [
-              pkgs.nixVersions.nix_2_34.dev
-            ];
-            nativeBuildInputs = [
-              pkgs.pkg-config
-              (pkgs.rustfmt.override { asNightly = true; })
-              ((mkRustToolchain pkgs).override {
-                extensions = [
-                  "clippy"
-                  "rust-analyzer"
-                  "rust-src"
-                ];
-              })
-            ];
-            env = {
-              # This silences a warning emitted by the build script of the
-              # nixb-cpp crate. See
-              # https://github.com/NixOS/nixpkgs/issues/395191 and
-              # https://github.com/NixOS/nixpkgs/pull/396373 for details.
-              NIX_CC_WRAPPER_SUPPRESS_TARGET_WARNING = "1";
-            };
-          };
+        _system: pkgs:
+        let
+          nixPackages = mkNixPackages pkgs;
+          nixSourceShells = pkgs.lib.mapAttrs' (nixSourceKey: _nixSource: {
+            name = "nix-${builtins.replaceStrings [ "_" ] [ "-" ] nixSourceKey}";
+            value = mkShell pkgs nixPackages.${nixSourceKey};
+          }) (mkNixSources pkgs);
+        in
+        nixSourceShells
+        // {
+          default = nixSourceShells."nix-2-34";
         }
       );
 
