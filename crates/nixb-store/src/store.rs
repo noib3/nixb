@@ -374,6 +374,24 @@ impl Store {
             .map(|ptr| (!ptr.is_null()).then(|| StorePath::new(ptr)))
     }
 
+    /// Queries metadata about a store path.
+    #[cfg(feature = "nix-2-35")]
+    #[inline]
+    pub fn query_path_info(
+        &mut self,
+        store_path: &StorePath,
+    ) -> Result<crate::PathInfo> {
+        let path_info = self.ctx.with_ptr(|ctx| unsafe {
+            nixb_sys::store_query_path_info(
+                ctx,
+                self.inner,
+                store_path.as_ptr(),
+            )
+        })?;
+
+        Ok(crate::PathInfo::new(CContext::create(), path_info))
+    }
+
     /// Calls the given function with the physical location of the given
     /// [`StorePath`] and returns its output.
     ///

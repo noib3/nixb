@@ -1,4 +1,4 @@
-//! This file is generated from Nix 152e2880281bbbd9fa03b6215d874eec0d0dc321 headers. Do not edit it manually.
+//! This file is generated from Nix 9d718847a1b97cc8476cb23c207cacf91ba136ed headers. Do not edit it manually.
 
 
 pub const __bool_true_false_are_defined: u32 = 1;
@@ -232,6 +232,80 @@ unsafe extern "C" {
 }
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
+pub struct path_info {
+    _unused: [u8; 0],
+}
+unsafe extern "C" {
+    #[doc = "Deallocate a nix_path_info\nDoes not fail.\n\n# Arguments\n\n* `path_info` [in]  - the nix_path_info to free"]
+    #[link_name = "nix_path_info_free"]
+    pub fn path_info_free(path_info: *mut path_info);
+}
+unsafe extern "C" {
+    #[doc = "Get the NAR hash of a store path\nReturns the hash as a string with algorithm prefix in Nix base-32 encoding,\ne.g. \"sha256:1b8m03r63zqhnjf7l5nh...\". This is the format used in narinfo files.\n\n# Arguments\n\n* `context` [out]  - Optional, stores error information\n* `path_info` [in]  - the nix_path_info to read from\n* `callback` [in]  - called with the hash string\n* `user_data` [in]  - arbitrary data, passed to the callback when it's called\n\n# Returns\n\nNIX_OK on success, error code on failure"]
+    #[link_name = "nix_path_info_get_nar_hash"]
+    pub fn path_info_get_nar_hash(
+        context: *mut c_context,
+        path_info: *const path_info,
+        callback: get_string_callback,
+        user_data: *mut ::core::ffi::c_void,
+    ) -> err;
+}
+unsafe extern "C" {
+    #[doc = "Get the NAR size of a store path\n\n# Arguments\n\n* `context` [out]  - Optional, stores error information\n* `path_info` [in]  - the nix_path_info to read from\n\n# Returns\n\nNAR size in bytes, 0 if unknown"]
+    #[link_name = "nix_path_info_get_nar_size"]
+    pub fn path_info_get_nar_size(context: *mut c_context, path_info: *const path_info) -> u64;
+}
+unsafe extern "C" {
+    #[doc = "Iterate over the references of a store path\nCalls the callback once for each reference. The StorePath passed to the\ncallback is borrowed and only valid for the duration of the callback.\n\n# Arguments\n\n* `context` [out]  - Optional, stores error information\n* `path_info` [in]  - the nix_path_info to read from\n* `user_data` [in]  - arbitrary data, passed to the callback\n* `callback` [in]  - called for each referenced store path\n\n# Returns\n\nNIX_OK on success, error code on failure"]
+    #[link_name = "nix_path_info_get_references"]
+    pub fn path_info_get_references(
+        context: *mut c_context,
+        path_info: *const path_info,
+        user_data: *mut ::core::ffi::c_void,
+        callback: ::core::option::Option<
+            unsafe extern "C" fn(
+                user_data: *mut ::core::ffi::c_void,
+                store_path: *const StorePath,
+            ) -> err,
+        >,
+    ) -> err;
+}
+unsafe extern "C" {
+    #[doc = "Get the deriver of a store path\n> **Note** Don't forget to free the result with nix_store_path_free()!\n\n# Arguments\n\n* `context` [out]  - Optional, stores error information\n* `path_info` [in]  - the nix_path_info to read from\n\n# Returns\n\nowned StorePath of the deriver, or NULL if no deriver is known"]
+    #[link_name = "nix_path_info_get_deriver"]
+    pub fn path_info_get_deriver(
+        context: *mut c_context,
+        path_info: *const path_info,
+    ) -> *mut StorePath;
+}
+unsafe extern "C" {
+    #[doc = "Iterate over the signatures of a store path\nCalls the callback once for each signature string (format: \"keyName:base64sig\").\n\n# Arguments\n\n* `context` [out]  - Optional, stores error information\n* `path_info` [in]  - the nix_path_info to read from\n* `user_data` [in]  - arbitrary data, passed to the callback\n* `callback` [in]  - called for each signature string\n\n# Returns\n\nNIX_OK on success, error code on failure"]
+    #[link_name = "nix_path_info_get_sigs"]
+    pub fn path_info_get_sigs(
+        context: *mut c_context,
+        path_info: *const path_info,
+        user_data: *mut ::core::ffi::c_void,
+        callback: ::core::option::Option<
+            unsafe extern "C" fn(
+                user_data: *mut ::core::ffi::c_void,
+                sig: *const ::core::ffi::c_char,
+                sig_len: ::core::ffi::c_uint,
+            ) -> err,
+        >,
+    ) -> err;
+}
+unsafe extern "C" {
+    #[doc = "Get the content address of a store path, if any\nIf the path is content-addressed, calls the callback with the rendered\ncontent address string. If not content-addressed, the callback is not called.\n\n# Arguments\n\n* `context` [out]  - Optional, stores error information\n* `path_info` [in]  - the nix_path_info to read from\n* `callback` [in]  - called with the content address string, if present\n* `user_data` [in]  - arbitrary data, passed to the callback when it's called\n\n# Returns\n\nNIX_OK on success, error code on failure"]
+    #[link_name = "nix_path_info_get_ca"]
+    pub fn path_info_get_ca(
+        context: *mut c_context,
+        path_info: *const path_info,
+        callback: get_string_callback,
+        user_data: *mut ::core::ffi::c_void,
+    ) -> err;
+}
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
 pub struct Store {
     _unused: [u8; 0],
 }
@@ -412,6 +486,15 @@ unsafe extern "C" {
         repair: bool,
         checkSigs: bool,
     ) -> err;
+}
+unsafe extern "C" {
+    #[doc = "Query metadata about a store path\nThe path must be valid in the store; otherwise an error is returned.\n> **Note** Don't forget to free this with nix_path_info_free()!\n\n# Arguments\n\n* `context` [out]  - Optional, stores error information\n* `store` [in]  - Nix store reference\n* `path` [in]  - The store path to query\n\n# Returns\n\nowned nix_path_info, NULL on error"]
+    #[link_name = "nix_store_query_path_info"]
+    pub fn store_query_path_info(
+        context: *mut c_context,
+        store: *mut Store,
+        path: *const StorePath,
+    ) -> *mut path_info;
 }
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
