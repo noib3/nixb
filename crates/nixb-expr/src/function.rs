@@ -81,31 +81,6 @@ pub trait Function {
     where
         Self: Sized + 'static,
     {
-        fn try_call<'args, Fun: Function + 'static>(
-            fun: &mut Fun,
-            args_list: ArgsList<'args>,
-            ctx: &mut Context,
-            dest: UninitValue,
-        ) -> Result<()> {
-            let args =
-                <Fun::Args<'args> as Args>::from_args_list(args_list, ctx)?;
-
-            let mut value = fun
-                .call(args, ctx)
-                .into_result()
-                .map_err(Into::into)?
-                .into_value(ctx);
-
-            // As described in the [docs] of `nix_init_apply`, it's not
-            // possible to return thunks from primops, so let's force the
-            // value before writing it to the return location.
-            //
-            // [docs]: https://github.com/NixOS/nix/blob/af0ac14/src/libexpr-c/nix_api_value.h#L564
-            value.force_inline(ctx)?;
-
-            value.write(dest, ctx)
-        }
-
         unsafe extern "C" fn callback<Fun: Function + 'static>(
             userdata: *mut c_void,
             ctx_raw: *mut nixb_sys::c_context,
@@ -147,7 +122,28 @@ pub trait Function {
             // uninitialized value.
             let dest = unsafe { UninitValue::new(dest_ptr) };
 
-            if let Err(err) = try_call(fun, args_list, &mut ctx, dest) {
+            let mut try_block = || {
+                let args = <Fun as Function>::Args::from_args_list(
+                    args_list, &mut ctx,
+                )?;
+
+                let mut value = fun
+                    .call(args, &mut ctx)
+                    .into_result()
+                    .map_err(Into::into)?
+                    .into_value(&mut ctx);
+
+                // As described in the [docs] of `nix_init_apply`, it's not
+                // possible to return thunks from primops, so let's force the
+                // value before writing it to the return location.
+                //
+                // [docs]: https://github.com/NixOS/nix/blob/af0ac14/src/libexpr-c/nix_api_value.h#L564
+                value.force_inline(&mut ctx)?;
+
+                value.write(dest, &mut ctx)
+            };
+
+            if let Err(err) = try_block() {
                 unsafe {
                     nixb_sys::set_err_msg(
                         ctx_raw,
