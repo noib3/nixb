@@ -361,9 +361,6 @@ pub struct ArgsList<'a> {
     _lifetime: PhantomData<&'a [*mut nixb_sys::Value]>,
 }
 
-#[doc(hidden)]
-pub struct NoArgs;
-
 impl<'a> ArgsList<'a> {
     /// Returns the value at the given argument index.
     ///
@@ -395,12 +392,12 @@ impl<'spec> Args<'spec> for ArgsList<'spec> {
 }
 
 impl<T: IntoValue + Clone> Function for T {
-    type Args<'a> = NoArgs;
+    type Args<'a> = ();
 
     #[inline]
     fn call<'this, 'eval, 'args>(
         &'this mut self,
-        _: NoArgs,
+        _: (),
         ctx: &mut Context<'eval>,
     ) -> impl Value + use<'this, 'args, 'eval, T> {
         self.clone().into_value(ctx)
@@ -419,12 +416,12 @@ impl<'a, A: Arg<'a>> Args<'a> for A {
     }
 }
 
-impl Args<'_> for NoArgs {
+impl Args<'_> for () {
     const NAMES: &'static [*const c_char] = &[ptr::null()];
 
     #[inline]
     fn from_args_list(_: ArgsList<'_>, _: &mut Context) -> Result<Self> {
-        Ok(Self)
+        Ok(())
     }
 }
 
