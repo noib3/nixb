@@ -141,7 +141,7 @@ pub struct NixThunk<Owner = Owned> {
 /// TODO: docs.
 pub fn thunk<F, MaybeRes>(fun: F) -> impl Thunk + Value + 'static
 where
-    F: FnOnce(&mut Context) -> MaybeRes + 'static,
+    F: FnOnce() -> MaybeRes + 'static,
     MaybeRes: IntoResult,
     MaybeRes::Output: IntoValue,
     MaybeRes::Error: Into<Error>,
@@ -230,15 +230,15 @@ impl<Owner: ValueOwner> Thunk for NixThunk<Owner> {
 
 impl<F, MaybeRes> Thunk for F
 where
-    F: FnOnce(&mut Context) -> MaybeRes,
+    F: FnOnce() -> MaybeRes,
     MaybeRes: IntoResult,
     MaybeRes::Error: Into<Error>,
 {
     type Output = MaybeRes::Output;
 
     #[inline(always)]
-    fn force(self, ctx: &mut Context) -> Result<Self::Output> {
-        (self)(ctx).into_result().map_err(Into::into)
+    fn force(self, _ctx: &mut Context) -> Result<Self::Output> {
+        (self)().into_result().map_err(Into::into)
     }
 }
 

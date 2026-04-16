@@ -17,8 +17,8 @@ impl IntoValue for MyPlugin {
             listSameType: ["foo", "baz", "baz"],
             listDifferentTypes: list!["string", 42],
             myAttrset: MyAttrset::default(),
-            mkHello: function::<String>(|name, _ctx: &mut Context| format!("Hello {name}!")),
-            lazyEval2: thunk(|_ctx: &mut Context| {
+            mkHello: function(|name: String| format!("Hello {name}!")),
+            lazyEval2: thunk(|| {
                 std::thread::sleep(std::time::Duration::from_secs(2));
                 42
             }),

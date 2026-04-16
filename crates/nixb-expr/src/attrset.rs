@@ -19,7 +19,7 @@ use nixb_result::{Error, ErrorKind, Result};
 use crate::callable::{Callable, NixLambda};
 use crate::context::{AttrsetBuilder, Context};
 use crate::error::TypeMismatchError;
-use crate::function::function;
+use crate::function::Function;
 use crate::tuple::Tuple;
 use crate::value::{
     Borrowed,
@@ -34,7 +34,7 @@ use crate::value::{
     ValueOwner,
     Values,
 };
-use crate::{ExprContext, IntoResult, Utf8CStr};
+use crate::{ExprContext, Utf8CStr};
 
 /// TODO: docs.
 pub trait Attrset {
@@ -488,18 +488,14 @@ impl<Owner: ValueOwner> NixDerivation<Owner> {
 
     /// Returns the output path of this derivation.
     #[inline]
-    pub fn override_attrs<'a, NewAttrs>(
+    pub fn override_attrs<'a>(
         &self,
-        fun: impl FnMut(NixAttrset<Borrowed<'a>>, &mut Context) -> NewAttrs
-        + 'static,
+        fun: impl Function<Args<'a> = NixAttrset<Borrowed<'a>>> + 'static,
         ctx: &mut Context,
-    ) -> Result<NixDerivation>
-    where
-        NewAttrs: IntoResult<Output: Attrset + Value, Error: Into<Error>> + 'a,
-    {
+    ) -> Result<NixDerivation> {
         self.inner
             .get::<NixLambda<_>>(c"overrideAttrs", ctx)?
-            .call(function::<NixAttrset<Borrowed<'a>>>(fun), ctx)?
+            .call(Function::into_value(fun), ctx)?
             .force_into(ctx)
     }
 

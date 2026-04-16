@@ -6,7 +6,7 @@ use nixb_expr::Utf8CStr;
 use nixb_expr::function::Function;
 
 /// TODO: docs.
-pub trait PrimOp: for<'a> Function<'a> + 'static {
+pub trait PrimOp: Function + 'static {
     #[doc(hidden)]
     const DOCS: Option<&'static CStr>;
 
