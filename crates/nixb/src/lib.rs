@@ -10,6 +10,9 @@ pub use nixb_expr as expr;
 pub use nixb_plugin as plugin;
 #[doc(inline)]
 pub use nixb_result as result;
+#[cfg(feature = "store")]
+#[doc(inline)]
+pub use nixb_store as store;
 
 pub mod prelude {
     //! TODO: docs.

@@ -31,6 +31,7 @@ nixb-expr = { path = "./crates/nixb-expr" }
 nixb-macros = { path = "./crates/nixb-macros" }
 nixb-plugin = { path = "./crates/nixb-plugin" }
 nixb-result = { path = "./crates/nixb-result" }
+nixb-store = { path = "./crates/nixb-store" }
 nixb-sys = { path = "./crates/nixb-sys" }
 
 [workspace.lints.clippy]

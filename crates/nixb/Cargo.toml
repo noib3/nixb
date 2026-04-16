@@ -30,6 +30,7 @@ nix-2-34 = [
 # Module-enabling features.
 expr = ["nixb-expr"]
 plugin = ["nixb-plugin"]
+store = ["nixb-store"]
 
 # Passthrough features.
 compact_str = ["nixb-expr?/compact_str"]
@@ -44,6 +45,7 @@ nixb-result = { workspace = true }
 
 nixb-expr = { workspace = true, optional = true }
 nixb-plugin = { workspace = true, optional = true }
+nixb-store = { workspace = true, optional = true }
 
 [lints]
 workspace = true

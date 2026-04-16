@@ -158,6 +158,7 @@ dependencies = [
  "nixb-expr",
  "nixb-plugin",
  "nixb-result",
+ "nixb-store",
 ]
 
 [[package]]
@@ -225,6 +226,14 @@ dependencies = [
 name = "nixb-result"
 version = "0.1.0"
 dependencies = [
+ "nixb-sys",
+]
+
+[[package]]
+name = "nixb-store"
+version = "0.1.0"
+dependencies = [
+ "nixb-result",
  "nixb-sys",
 ]
 
