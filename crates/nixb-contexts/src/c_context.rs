@@ -1,25 +1,41 @@
+//! TODO: docs.
+
 use alloc::borrow::ToOwned;
 use core::ffi::CStr;
 use core::{ptr, slice};
 
 /// TODO: docs.
-pub trait Context {
+pub struct CContext {
+    ptr: *mut nixb_sys::c_context,
+}
+
+impl CContext {
     /// TODO: docs.
-    fn as_ptr(&mut self) -> *mut nixb_sys::c_context;
+    #[track_caller]
+    #[inline]
+    pub fn create() -> Self {
+        Self::new(unsafe { nixb_sys::c_context_create() })
+    }
+
+    /// TODO: docs.
+    #[track_caller]
+    #[inline]
+    pub fn new(ptr: *mut nixb_sys::c_context) -> Self {
+        assert!(!ptr.is_null());
+        Self { ptr }
+    }
 
     /// TODO: docs.
     #[inline]
-    fn with_ptr<T>(
+    pub fn with_ptr<T>(
         &mut self,
         fun: impl FnOnce(*mut nixb_sys::c_context) -> T,
     ) -> nixb_result::Result<T> {
-        let ptr = self.as_ptr();
-        let ret = fun(ptr);
-        check_err(ptr).map(|()| ret)
+        let ret = fun(self.ptr);
+        check_err(self.ptr).map(|()| ret)
     }
 }
 
-#[allow(clippy::undocumented_unsafe_blocks)]
 fn check_err(ctx: *mut nixb_sys::c_context) -> nixb_result::Result<()> {
     let kind = match unsafe { nixb_sys::err_code(ctx) } {
         nixb_sys::err_NIX_OK => return Ok(()),

@@ -1,7 +1,7 @@
 //! TODO: docs.
 
 #[doc(inline)]
-pub use nixb_context as context;
+pub use nixb_contexts as contexts;
 #[cfg(feature = "expr")]
 #[doc(inline)]
 pub use nixb_expr as expr;
@@ -10,6 +10,9 @@ pub use nixb_expr as expr;
 pub use nixb_plugin as plugin;
 #[doc(inline)]
 pub use nixb_result as result;
+#[cfg(feature = "store")]
+#[doc(inline)]
+pub use nixb_store as store;
 
 pub mod prelude {
     //! TODO: docs.

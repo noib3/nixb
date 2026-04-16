@@ -16,7 +16,7 @@ smallvec = ["dep:smallvec"]
 std = []
 
 [dependencies]
-nixb-context = { workspace = true }
+nixb-contexts = { workspace = true }
 nixb-cpp = { workspace = true }
 nixb-macros = { workspace = true }
 nixb-result = { workspace = true }

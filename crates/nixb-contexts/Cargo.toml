@@ -1,0 +1,20 @@
+[package]
+name = "nixb-contexts"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[features]
+c = ["dep:nixb-sys"]
+nix-2-32 = ["nixb-sys?/nix-2-32"]
+nix-2-33 = ["nix-2-32", "nixb-sys?/nix-2-33"]
+nix-2-34 = ["nix-2-33", "nixb-sys?/nix-2-34"]
+
+[dependencies]
+nixb-result = { workspace = true }
+
+nixb-sys = { workspace = true, optional = true }
+
+[lints]
+workspace = true

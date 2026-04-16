@@ -1,5 +1,5 @@
 [package]
-name = "nixb-context"
+name = "nixb-store"
 version.workspace = true
 edition.workspace = true
 authors.workspace = true
@@ -11,6 +11,7 @@ nix-2-33 = ["nix-2-32", "nixb-sys/nix-2-33"]
 nix-2-34 = ["nix-2-33", "nixb-sys/nix-2-34"]
 
 [dependencies]
+nixb-contexts = { workspace = true }
 nixb-result = { workspace = true }
 nixb-sys = { workspace = true }
 

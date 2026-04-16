@@ -8,7 +8,7 @@ use crate::callable::{Callable, NixLambda};
 use crate::value::{NixValue, ValueOwner};
 
 /// TODO: docs.
-pub trait ExprContext: nixb_context::Context {
+pub trait ExprContext {
     /// TODO: docs.
     fn get_attr_byname_lazy<'a, O: ValueOwner>(
         &mut self,
@@ -87,12 +87,5 @@ impl ExprContext for crate::context::Context<'_> {
             nixb_sys::realised_string_free(realised_str);
         }
         Ok(())
-    }
-}
-
-impl nixb_context::Context for crate::context::Context<'_> {
-    #[inline]
-    fn as_ptr(&mut self) -> *mut nixb_sys::c_context {
-        todo!()
     }
 }
