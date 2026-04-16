@@ -1,22 +1,22 @@
 { fetchFromGitHub }:
 
 {
-  "2_32" = fetchFromGitHub {
-    owner = "NixOS";
-    repo = "nix";
-    rev = "2.32.6";
-    sha256 = "1rp59n297mh6h5sbqbz5kg43j3arph5dph7yx0iwy1jzkb3gg8g5";
-  };
   "2_33" = fetchFromGitHub {
     owner = "NixOS";
     repo = "nix";
-    rev = "2.33.3";
-    sha256 = "0jm8wdg6iprhpja35v80cwi17nwdbklf71caq75y7d2rxzhimj6q";
+    rev = "2.33.4";
+    sha256 = "0c6ik4rcww1r135gfn324cl3ic7lly6iyz52j42jdgb2gzp7mi29";
   };
   "2_34" = fetchFromGitHub {
     owner = "NixOS";
     repo = "nix";
-    rev = "2.34.2";
-    sha256 = "0i235h58b6sncd9p7sd1f4npmccwn4jznw2rx2kflz1fq62ahqbz";
+    rev = "2.34.6";
+    sha256 = "139j1iwlhy0yv2lr7h96d6vrrb9gq3dp007cgzvx2bp1xj334wwh";
+  };
+  "2_35" = fetchFromGitHub {
+    owner = "NixOS";
+    repo = "nix";
+    rev = "152e2880281bbbd9fa03b6215d874eec0d0dc321";
+    sha256 = "0mnnyv616n1b6vf0yaqxj68zgmi8lz3m33as62qqh5dp227k17l1";
   };
 }

@@ -1,4 +1,4 @@
-//! This file is generated from Nix 2.34.2 headers. Do not edit it manually.
+//! This file is generated from Nix 2.34.6 headers. Do not edit it manually.
 
 
 pub const __bool_true_false_are_defined: u32 = 1;
