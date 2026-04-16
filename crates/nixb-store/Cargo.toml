@@ -11,7 +11,7 @@ nix-2-34 = ["nix-2-33", "nixb-sys/nix-2-34"]
 nix-2-35 = ["nix-2-34", "nixb-sys/nix-2-35"]
 
 [dependencies]
-nixb-contexts = { workspace = true }
+nixb-contexts = { workspace = true, features = ["c"] }
 nixb-result = { workspace = true }
 nixb-sys = { workspace = true }
 
