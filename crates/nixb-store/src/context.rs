@@ -1,6 +1,6 @@
 //! TODO: docs.
 
-use core::ffi::CStr;
+use core::ffi::{CStr, c_void};
 use core::ptr;
 
 use nixb_contexts::c_context::CContext;
@@ -16,12 +16,36 @@ pub struct CStoreContext {
 impl CStoreContext {
     /// TODO: docs.
     #[inline]
-    pub fn get_fs_closure(
+    pub fn get_fs_closure<F>(
         &mut self,
         store_path: &StorePath,
-        _fun: (),
+        fun: F,
         opts: GetFsClosureOpts,
-    ) -> nixb_result::Result<()> {
+    ) -> nixb_result::Result<()>
+    where
+        F: FnMut(&mut Self, &StorePath),
+    {
+        struct CallbackState<F> {
+            store: *mut nixb_sys::Store,
+            fun: F,
+        }
+
+        unsafe extern "C" fn callback<F>(
+            ctx: *mut nixb_sys::c_context,
+            userdata: *mut c_void,
+            store_path: *const nixb_sys::StorePath,
+        ) where
+            F: FnMut(&mut CStoreContext, &StorePath),
+        {
+            let ctx = CContext::new(ctx);
+            let state = unsafe { &mut *userdata.cast::<CallbackState<F>>() };
+            let mut store_ctx = CStoreContext::new(ctx, state.store);
+            let store_path = StorePath { inner: store_path.cast_mut() };
+            (state.fun)(&mut store_ctx, &store_path);
+        }
+
+        let mut state = CallbackState { store: self.store, fun };
+
         self.inner.with_ptr(|ctx| unsafe {
             nixb_sys::store_get_fs_closure(
                 ctx,
@@ -30,8 +54,8 @@ impl CStoreContext {
                 opts.flip_direction,
                 opts.include_outputs,
                 opts.include_derivers,
-                ptr::null_mut(),
-                None,
+                (&mut state as *mut CallbackState<_>).cast(),
+                Some(callback::<F>),
             );
         })
     }
@@ -47,7 +71,7 @@ impl CStoreContext {
         let store = ctx.with_ptr(|ctx| unsafe {
             nixb_sys::store_open(ctx, uri.as_ref().as_ptr(), ptr::null_mut())
         })?;
-        Ok(Self { inner: ctx, store })
+        Ok(Self::new(ctx, store))
     }
 
     /// TODO: docs.
@@ -65,6 +89,11 @@ impl CStoreContext {
                 )
             })
             .map(|path_ptr| StorePath { inner: path_ptr })
+    }
+
+    #[inline]
+    fn new(inner: CContext, store: *mut nixb_sys::Store) -> Self {
+        Self { inner, store }
     }
 }
 

@@ -2,12 +2,11 @@
 
 use alloc::borrow::ToOwned;
 use core::ffi::CStr;
-use core::ptr::{self, NonNull};
-use core::slice;
+use core::{ptr, slice};
 
 /// TODO: docs.
 pub struct CContext {
-    ptr: NonNull<nixb_sys::c_context>,
+    ptr: *mut nixb_sys::c_context,
 }
 
 impl CContext {
@@ -15,10 +14,14 @@ impl CContext {
     #[track_caller]
     #[inline]
     pub fn create() -> Self {
-        let Some(ptr) = NonNull::new(unsafe { nixb_sys::c_context_create() })
-        else {
-            panic!("couldn't allocate new C context");
-        };
+        Self::new(unsafe { nixb_sys::c_context_create() })
+    }
+
+    /// TODO: docs.
+    #[track_caller]
+    #[inline]
+    pub fn new(ptr: *mut nixb_sys::c_context) -> Self {
+        assert!(!ptr.is_null());
         Self { ptr }
     }
 
@@ -28,9 +31,8 @@ impl CContext {
         &mut self,
         fun: impl FnOnce(*mut nixb_sys::c_context) -> T,
     ) -> nixb_result::Result<T> {
-        let ptr = self.ptr.as_ptr();
-        let ret = fun(ptr);
-        check_err(ptr).map(|()| ret)
+        let ret = fun(self.ptr);
+        check_err(self.ptr).map(|()| ret)
     }
 }
 
