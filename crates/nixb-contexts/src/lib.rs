@@ -4,6 +4,5 @@
 
 extern crate alloc;
 
-mod context;
-
-pub use context::Context;
+#[cfg(feature = "c")]
+pub mod c_context;

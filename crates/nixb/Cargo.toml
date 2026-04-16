@@ -6,23 +6,26 @@ authors.workspace = true
 license.workspace = true
 
 [features]
-default = ["dlopen", "nix-2-34"]
+default = ["dlopen", "context-c", "nix-2-34"]
+
+# Contexts.
+context-c = ["nixb-contexts/c", "nixb-store?/context-c"]
 
 # Nix versions.
 nix-2-32 = [
-  "nixb-context/nix-2-32",
+  "nixb-contexts/nix-2-32",
   "nixb-expr?/nix-2-32",
   "nixb-plugin?/nix-2-32",
 ]
 nix-2-33 = [
   "nix-2-32",
-  "nixb-context/nix-2-33",
+  "nixb-contexts/nix-2-33",
   "nixb-expr?/nix-2-33",
   "nixb-plugin?/nix-2-33",
 ]
 nix-2-34 = [
   "nix-2-33",
-  "nixb-context/nix-2-34",
+  "nixb-contexts/nix-2-34",
   "nixb-expr?/nix-2-34",
   "nixb-plugin?/nix-2-34",
 ]
@@ -40,7 +43,7 @@ smallvec = ["nixb-expr?/smallvec"]
 std = ["nixb-expr?/std"]
 
 [dependencies]
-nixb-context = { workspace = true }
+nixb-contexts = { workspace = true }
 nixb-result = { workspace = true }
 
 nixb-expr = { workspace = true, optional = true }

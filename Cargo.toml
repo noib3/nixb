@@ -25,7 +25,7 @@ syn = "2"
 
 # Internal dependencies.
 nixb = { path = "./crates/nixb", default-features = false }
-nixb-context = { path = "./crates/nixb-context" }
+nixb-contexts = { path = "./crates/nixb-contexts" }
 nixb-cpp = { path = "./crates/nixb-cpp" }
 nixb-expr = { path = "./crates/nixb-expr" }
 nixb-macros = { path = "./crates/nixb-macros" }
@@ -47,7 +47,6 @@ std_instead_of_core = "warn"
 too_many_arguments = "deny"
 too_many_lines = "deny"
 trivially_copy_pass_by_ref = "warn"
-undocumented_unsafe_blocks = "deny"
 unwrap_used = "deny"
 use_self = "warn"
 wildcard_dependencies = "deny"
