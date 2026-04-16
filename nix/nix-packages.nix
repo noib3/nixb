@@ -3,6 +3,7 @@
   generateSplicesForMkScope,
   lib,
   nixDependencies,
+  perl,
   zstd,
   # --,
   nixpkgs,
@@ -17,6 +18,12 @@ let
   mkNixPackage =
     nixSourceKey: nixSource:
     let
+      nixPackageVersion =
+        if builtins.match "[0-9]+\\.[0-9]+\\.[0-9]+.*" nixSource.rev != null then
+          nixSource.rev
+        else
+          "${builtins.replaceStrings [ "_" ] [ "." ] nixSourceKey}.0";
+
       nixComponentsBase =
         nixDependencies.callPackage
           "${nixpkgs}/pkgs/tools/package-management/nix/modular/packages.nix"
@@ -27,7 +34,7 @@ let
               "nixComponents_${nixSourceKey}"
             ];
             src = nixSource;
-            version = nixSource.rev;
+            version = nixPackageVersion;
           };
 
       nixComponents = nixComponentsBase.overrideScope (
@@ -36,6 +43,17 @@ let
             buildInputs =
               (prevAttrs.buildInputs or [ ])
               ++ lib.optionals (nixSourceKey == "2_35") [ zstd ];
+          });
+
+          nix-store = prevScope.nix-store.overrideAttrs (prevAttrs: {
+            nativeBuildInputs =
+              (prevAttrs.nativeBuildInputs or [ ])
+              ++ lib.optionals (nixSourceKey == "2_35") [ perl ];
+            postPatch =
+              (prevAttrs.postPatch or "")
+              + lib.optionalString (nixSourceKey == "2_35") ''
+                perl -0pi -e 's/#include <cstring>/#include <cstring>\n#include <regex>/' optimise-store.cc
+              '';
           });
         }
       );
