@@ -233,11 +233,7 @@ extern "C" nix_err force_value(nix_c_context *context, nix::EvalState *state,
 
 extern "C" void init_path_string(nix::EvalState *state, nix::Value *value,
                                  const char *str) {
-#ifdef NIX_2_32
-  value->mkPath(state->rootPath(nix::CanonPath(str)));
-#else
   value->mkPath(state->rootPath(nix::CanonPath(str)), state->mem);
-#endif
 }
 
 extern "C" nix_err value_call_multi(nix_c_context *context,

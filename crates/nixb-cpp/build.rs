@@ -2,9 +2,9 @@
 
 use std::env;
 
-const NIX_2_32_FEATURE: &str = "CARGO_FEATURE_NIX_2_32";
 const NIX_2_33_FEATURE: &str = "CARGO_FEATURE_NIX_2_33";
 const NIX_2_34_FEATURE: &str = "CARGO_FEATURE_NIX_2_34";
+const NIX_2_35_FEATURE: &str = "CARGO_FEATURE_NIX_2_35";
 
 fn main() {
     let target_nix = NixVersion::selected();
@@ -32,34 +32,34 @@ fn main() {
 
     println!("cargo:rerun-if-changed=cpp/wrapper.cpp");
     println!("cargo:rerun-if-changed=cpp/function.cpp");
-    println!("cargo:rerun-if-env-changed={NIX_2_32_FEATURE}");
     println!("cargo:rerun-if-env-changed={NIX_2_33_FEATURE}");
     println!("cargo:rerun-if-env-changed={NIX_2_34_FEATURE}");
+    println!("cargo:rerun-if-env-changed={NIX_2_35_FEATURE}");
 }
 
 #[derive(Copy, Clone)]
 enum NixVersion {
-    Nix232,
     Nix233,
     Nix234,
+    Nix235,
 }
 
 impl NixVersion {
     fn as_cpp_define(self) -> &'static str {
         match self {
-            Self::Nix232 => "NIX_2_32",
             Self::Nix233 => "NIX_2_33",
             Self::Nix234 => "NIX_2_34",
+            Self::Nix235 => "NIX_2_35",
         }
     }
 
     fn selected() -> Self {
         if env::var_os(NIX_2_34_FEATURE).is_some() {
             Self::Nix234
+        } else if env::var_os(NIX_2_35_FEATURE).is_some() {
+            Self::Nix235
         } else if env::var_os(NIX_2_33_FEATURE).is_some() {
             Self::Nix233
-        } else if env::var_os(NIX_2_32_FEATURE).is_some() {
-            Self::Nix232
         } else {
             unreachable!()
         }
