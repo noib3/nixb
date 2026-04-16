@@ -384,8 +384,8 @@ impl<'a> ArgsList<'a> {
 }
 
 impl<'spec> Args<'spec> for ArgsList<'spec> {
-    // `ArgsList` only models the raw callback arguments. If names are needed,
-    // the `Function` implementation must override `args_names`.
+    // The only Function impl using ArgsList as their Args is the one returned
+    // by `function()`, which overrides `args_names`.
     const NAMES: &'static [*const c_char] = unreachable!();
 
     #[inline]
