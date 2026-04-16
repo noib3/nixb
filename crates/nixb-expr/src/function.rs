@@ -263,6 +263,15 @@ pub trait Args<'a>: Sized {
 }
 
 /// TODO: docs.
+pub trait FnMutOutputIntoResult<Args> {
+    /// TODO: docs.
+    type Output: IntoResult<Output: IntoValue, Error: Into<Error>>;
+
+    /// TODO: docs.
+    fn call(&mut self, args: Args) -> Self::Output;
+}
+
+/// TODO: docs.
 #[inline]
 #[allow(clippy::too_many_lines)]
 pub fn function<'a, A: Args<'a>>(
@@ -380,17 +389,6 @@ impl<'a> ArgsList<'a> {
     }
 }
 
-impl<'spec> Args<'spec> for ArgsList<'spec> {
-    // The only Function impl using ArgsList as their Args is the one returned
-    // by `function()`, which overrides `args_names`.
-    const NAMES: &'static [*const c_char] = unreachable!();
-
-    #[inline]
-    fn from_args_list(args_list: Self, _: &mut Context) -> Result<Self> {
-        Ok(args_list)
-    }
-}
-
 impl<T: IntoValue + Clone> Function for T {
     type Args<'a> = ();
 
@@ -432,13 +430,15 @@ impl Args<'_> for () {
     }
 }
 
-/// TODO: docs.
-pub trait FnMutOutputIntoResult<Args> {
-    /// TODO: docs.
-    type Output: IntoResult<Output: IntoValue, Error: Into<Error>>;
+impl<'spec> Args<'spec> for ArgsList<'spec> {
+    // The only Function impl using ArgsList as their Args is the one returned
+    // by `function()`, which overrides `args_names`.
+    const NAMES: &'static [*const c_char] = unreachable!();
 
-    /// TODO: docs.
-    fn call(&mut self, args: Args) -> Self::Output;
+    #[inline]
+    fn from_args_list(args_list: Self, _: &mut Context) -> Result<Self> {
+        Ok(args_list)
+    }
 }
 
 impl<F, A, R> FnMutOutputIntoResult<A> for F
