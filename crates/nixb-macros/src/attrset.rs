@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-use std::collections::hash_map::Entry;
 use std::ffi::CString;
 
 use proc_macro2::{Literal, Span, TokenStream};
@@ -120,12 +118,6 @@ struct KeyValuePair {
 enum Key {
     Literal(CString),
     Expr(syn::Expr),
-}
-
-struct LiteralKey {
-    name: String,
-    c_string: CString,
-    span: Span,
 }
 
 impl Parse for Attrset {
