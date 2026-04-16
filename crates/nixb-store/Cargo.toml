@@ -6,16 +6,14 @@ authors.workspace = true
 license.workspace = true
 
 [features]
-context-c = ["dep:nixb-sys", "nixb-contexts/c"]
-nix-2-32 = ["nixb-sys?/nix-2-32"]
-nix-2-33 = ["nix-2-32", "nixb-sys?/nix-2-33"]
-nix-2-34 = ["nix-2-33", "nixb-sys?/nix-2-34"]
+nix-2-32 = ["nixb-sys/nix-2-32"]
+nix-2-33 = ["nix-2-32", "nixb-sys/nix-2-33"]
+nix-2-34 = ["nix-2-33", "nixb-sys/nix-2-34"]
 
 [dependencies]
 nixb-contexts = { workspace = true }
 nixb-result = { workspace = true }
-
-nixb-sys = { workspace = true, optional = true }
+nixb-sys = { workspace = true }
 
 [lints]
 workspace = true

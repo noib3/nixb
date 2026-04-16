@@ -9,7 +9,7 @@ license.workspace = true
 default = ["dlopen", "context-c", "nix-2-34"]
 
 # Contexts.
-context-c = ["nixb-contexts/c", "nixb-store?/context-c"]
+context-c = ["nixb-contexts/c"]
 
 # Nix versions.
 nix-2-32 = [
