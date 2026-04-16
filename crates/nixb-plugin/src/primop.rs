@@ -2,8 +2,8 @@
 
 use core::ffi::CStr;
 
-use nixb_expr::function::Function;
 use nixb_expr::Utf8CStr;
+use nixb_expr::function::Function;
 
 /// TODO: docs.
 pub trait PrimOp: Function + 'static {
