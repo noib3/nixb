@@ -1,19 +1,19 @@
 //! TODO: docs.
 
 use core::ffi::{CStr, c_void};
-use core::ptr;
+use core::{mem, ptr};
 
 use nixb_contexts::c_context::CContext;
 
 use crate::{GetFsClosureOpts, InitSentinel, StoreParam, StorePath};
 
 /// TODO: docs.
-pub struct CStoreContext {
-    inner: CContext,
-    store: *mut nixb_sys::Store,
+pub struct Store {
+    ctx: CContext,
+    inner: *mut nixb_sys::Store,
 }
 
-impl CStoreContext {
+impl Store {
     /// TODO: docs.
     #[inline]
     pub fn get_fs_closure<F>(
@@ -35,21 +35,21 @@ impl CStoreContext {
             userdata: *mut c_void,
             store_path: *const nixb_sys::StorePath,
         ) where
-            F: FnMut(&mut CStoreContext, &StorePath),
+            F: FnMut(&mut Store, &StorePath),
         {
-            let ctx = CContext::new(ctx);
             let state = unsafe { &mut *userdata.cast::<CallbackState<F>>() };
-            let mut store_ctx = CStoreContext::new(ctx, state.store);
+            let mut this = Store::new(CContext::new(ctx), state.store);
             let store_path = StorePath { inner: store_path.cast_mut() };
-            (state.fun)(&mut store_ctx, &store_path);
+            (state.fun)(&mut this, &store_path);
+            mem::forget(this);
         }
 
-        let mut state = CallbackState { store: self.store, fun };
+        let mut state = CallbackState { store: self.inner, fun };
 
-        self.inner.with_ptr(|ctx| unsafe {
+        self.ctx.with_ptr(|ctx| unsafe {
             nixb_sys::store_get_fs_closure(
                 ctx,
-                self.store,
+                self.inner,
                 store_path.inner,
                 opts.flip_direction,
                 opts.include_outputs,
@@ -80,11 +80,11 @@ impl CStoreContext {
         &mut self,
         store_path: impl AsRef<CStr>,
     ) -> nixb_result::Result<StorePath> {
-        self.inner
+        self.ctx
             .with_ptr(|ctx| unsafe {
                 nixb_sys::store_parse_path(
                     ctx,
-                    self.store,
+                    self.inner,
                     store_path.as_ref().as_ptr(),
                 )
             })
@@ -92,13 +92,13 @@ impl CStoreContext {
     }
 
     #[inline]
-    fn new(inner: CContext, store: *mut nixb_sys::Store) -> Self {
-        Self { inner, store }
+    fn new(ctx: CContext, store: *mut nixb_sys::Store) -> Self {
+        Self { ctx, inner: store }
     }
 }
 
-impl Drop for CStoreContext {
+impl Drop for Store {
     fn drop(&mut self) {
-        unsafe { nixb_sys::store_free(self.store) };
+        unsafe { nixb_sys::store_free(self.inner) };
     }
 }
