@@ -108,6 +108,7 @@ pub(crate) fn open() {
     }
 }
 
+#[expect(clippy::too_many_lines)]
 fn open_impl() -> Result<(), DyLibOpenError> {
     let loaded_nix = loaded_nix_runtime()?;
 
@@ -284,7 +285,9 @@ fn loaded_nix_runtime() -> Result<LoadedNixRuntime, DyLibOpenError> {
     Ok(LoadedNixRuntime { version, store_paths })
 }
 
-fn parse_loaded_nix_dylib(lib_path: &std::ffi::CStr) -> Option<LoadedNixDylib> {
+fn parse_loaded_nix_dylib(
+    lib_path: &core::ffi::CStr,
+) -> Option<LoadedNixDylib> {
     let lib_path = lib_path.to_bytes();
 
     // We look for library paths of the form:
