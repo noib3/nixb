@@ -39,7 +39,7 @@ impl Store {
         {
             let state = unsafe { &mut *userdata.cast::<CallbackState<F>>() };
             let mut this = Store::new(CContext::new(ctx), state.store);
-            let store_path = StorePath { inner: store_path.cast_mut() };
+            let store_path = StorePath::new(store_path.cast_mut());
             (state.fun)(&mut this, &store_path);
             mem::forget(this);
         }
@@ -50,7 +50,7 @@ impl Store {
             nixb_sys::store_get_fs_closure(
                 ctx,
                 self.inner,
-                store_path.inner,
+                store_path.as_ptr(),
                 opts.flip_direction,
                 opts.include_outputs,
                 opts.include_derivers,
@@ -88,7 +88,7 @@ impl Store {
                     store_path.as_ref().as_ptr(),
                 )
             })
-            .map(|path_ptr| StorePath { inner: path_ptr })
+            .map(StorePath::new)
     }
 
     #[inline]

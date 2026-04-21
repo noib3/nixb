@@ -36,6 +36,13 @@ impl CContext {
     }
 }
 
+impl Drop for CContext {
+    #[inline]
+    fn drop(&mut self) {
+        unsafe { nixb_sys::c_context_free(self.ptr) };
+    }
+}
+
 fn check_err(ctx: *mut nixb_sys::c_context) -> nixb_result::Result<()> {
     let kind = match unsafe { nixb_sys::err_code(ctx) } {
         nixb_sys::err_NIX_OK => return Ok(()),
