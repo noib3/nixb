@@ -90,6 +90,14 @@ impl Store {
     }
 }
 
+// SAFETY: Nix's C store wrapper owns a `nix::ref<nix::Store>` and Nix itself
+// passes store refs to worker threads.
+unsafe impl Send for Store {}
+
+// SAFETY: `&Store` does not permit calling into Nix: the raw pointer is
+// private, and all methods require `&mut self`.
+unsafe impl Sync for Store {}
+
 impl Drop for Store {
     fn drop(&mut self) {
         unsafe { nixb_sys::store_free(self.inner) };

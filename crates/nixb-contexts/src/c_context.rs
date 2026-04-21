@@ -36,6 +36,14 @@ impl CContext {
     }
 }
 
+// SAFETY: `nix_c_context` is heap-allocated error state, and nothing in Nix's
+// C API indicates that it must stay on the thread where it was created.
+unsafe impl Send for CContext {}
+
+// SAFETY: `&CContext` does not permit calling into Nix: the raw pointer is
+// private, and `with_ptr` requires `&mut self`.
+unsafe impl Sync for CContext {}
+
 impl Drop for CContext {
     #[inline]
     fn drop(&mut self) {
