@@ -234,6 +234,7 @@ name = "nixb-store"
 version = "0.1.0"
 dependencies = [
  "nixb-contexts",
+ "nixb-cpp",
  "nixb-error",
  "nixb-sys",
 ]

@@ -90,6 +90,15 @@ impl Store {
     }
 }
 
+impl Clone for Store {
+    #[inline]
+    fn clone(&self) -> Self {
+        let store = unsafe { nixb_cpp::store_clone(self.inner) };
+        assert!(!store.is_null());
+        Self::new(CContext::create(), store)
+    }
+}
+
 // SAFETY: Nix's C store wrapper owns a `nix::ref<nix::Store>` and Nix itself
 // passes store refs to worker threads.
 unsafe impl Send for Store {}

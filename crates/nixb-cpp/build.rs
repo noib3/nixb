@@ -27,11 +27,13 @@ fn main() {
         .define(target_nix.as_cpp_define(), None)
         .file("cpp/wrapper.cpp")
         .file("cpp/function.cpp")
+        .file("cpp/store.cpp")
         .flag("-std=c++23")
         .compile("nixb_cpp");
 
     println!("cargo:rerun-if-changed=cpp/wrapper.cpp");
     println!("cargo:rerun-if-changed=cpp/function.cpp");
+    println!("cargo:rerun-if-changed=cpp/store.cpp");
     println!("cargo:rerun-if-env-changed={NIX_2_33_FEATURE}");
     println!("cargo:rerun-if-env-changed={NIX_2_34_FEATURE}");
     println!("cargo:rerun-if-env-changed={NIX_2_35_FEATURE}");

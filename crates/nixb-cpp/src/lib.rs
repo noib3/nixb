@@ -7,6 +7,7 @@
 #![no_std]
 
 mod function;
+mod store;
 
 use core::ffi::{c_char, c_uint, c_void};
 
@@ -14,6 +15,7 @@ pub use function::{FunctionCallback, init_function};
 #[cfg(not(feature = "nix-2-34"))]
 use nixb_sys::{BindingsBuilder, ListBuilder, realised_string};
 use nixb_sys::{EvalState, Value, c_context, err};
+pub use store::store_clone;
 
 /// Opaque type representing an attribute set iterator.
 #[repr(C)]
