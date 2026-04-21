@@ -27,10 +27,10 @@ syn = "2"
 nixb = { path = "./crates/nixb", default-features = false }
 nixb-contexts = { path = "./crates/nixb-contexts" }
 nixb-cpp = { path = "./crates/nixb-cpp" }
+nixb-error = { path = "./crates/nixb-error" }
 nixb-expr = { path = "./crates/nixb-expr" }
 nixb-macros = { path = "./crates/nixb-macros" }
 nixb-plugin = { path = "./crates/nixb-plugin" }
-nixb-result = { path = "./crates/nixb-result" }
 nixb-store = { path = "./crates/nixb-store" }
 nixb-sys = { path = "./crates/nixb-sys" }
 

@@ -18,8 +18,8 @@ std = []
 [dependencies]
 nixb-contexts = { workspace = true }
 nixb-cpp = { workspace = true }
+nixb-error = { workspace = true }
 nixb-macros = { workspace = true }
-nixb-result = { workspace = true }
 nixb-sys = { workspace = true }
 
 compact_str = { workspace = true, optional = true }

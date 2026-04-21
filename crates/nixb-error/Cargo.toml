@@ -1,5 +1,5 @@
 [package]
-name = "nixb-result"
+name = "nixb-error"
 version.workspace = true
 edition.workspace = true
 authors.workspace = true

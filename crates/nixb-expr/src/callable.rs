@@ -2,7 +2,7 @@
 
 use core::ptr;
 
-use nixb_result::Result;
+use nixb_error::Result;
 
 use crate::attrset::NixAttrset;
 use crate::context::Context;

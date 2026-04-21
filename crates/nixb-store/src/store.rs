@@ -4,6 +4,7 @@ use core::ffi::{CStr, c_void};
 use core::{mem, ptr};
 
 use nixb_contexts::c_context::CContext;
+use nixb_error::Result;
 
 use crate::{GetFsClosureOpts, InitSentinel, StoreParam, StorePath};
 
@@ -21,7 +22,7 @@ impl Store {
         store_path: &StorePath,
         fun: F,
         opts: GetFsClosureOpts,
-    ) -> nixb_result::Result<()>
+    ) -> Result<()>
     where
         F: FnMut(&mut Self, &StorePath),
     {
@@ -42,6 +43,7 @@ impl Store {
             let store_path = StorePath::new(store_path.cast_mut());
             (state.fun)(&mut this, &store_path);
             mem::forget(this);
+            mem::forget(store_path);
         }
 
         let mut state = CallbackState { store: self.inner, fun };
@@ -67,7 +69,7 @@ impl Store {
         uri: impl AsRef<CStr>,
         _params: impl IntoIterator<Item = StoreParam>,
         mut ctx: CContext,
-    ) -> nixb_result::Result<Self> {
+    ) -> Result<Self> {
         let store = ctx.with_ptr(|ctx| unsafe {
             nixb_sys::store_open(ctx, uri.as_ref().as_ptr(), ptr::null_mut())
         })?;
@@ -79,7 +81,7 @@ impl Store {
     pub fn parse_path(
         &mut self,
         store_path: impl AsRef<CStr>,
-    ) -> nixb_result::Result<StorePath> {
+    ) -> Result<StorePath> {
         self.ctx
             .with_ptr(|ctx| unsafe {
                 nixb_sys::store_parse_path(

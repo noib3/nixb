@@ -7,7 +7,7 @@ use core::ops::{Deref, DerefMut};
 use core::ptr::{self, NonNull};
 use core::slice;
 
-use nixb_result::{Error, ErrorKind, Result};
+use nixb_error::{Error, ErrorKind, Result};
 
 use crate::attrset::NixAttrset;
 use crate::builtins::Builtins;

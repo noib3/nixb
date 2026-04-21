@@ -2,14 +2,14 @@
 
 #[doc(inline)]
 pub use nixb_contexts as contexts;
+#[doc(inline)]
+pub use nixb_error::{Error, ErrorKind, Result};
 #[cfg(feature = "expr")]
 #[doc(inline)]
 pub use nixb_expr as expr;
 #[cfg(feature = "plugin")]
 #[doc(inline)]
 pub use nixb_plugin as plugin;
-#[doc(inline)]
-pub use nixb_result as result;
 #[cfg(feature = "store")]
 #[doc(inline)]
 pub use nixb_store as store;

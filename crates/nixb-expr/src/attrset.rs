@@ -13,8 +13,8 @@ use core::ptr::NonNull;
 use core::result::Result as CoreResult;
 use core::{fmt, mem};
 
+use nixb_error::{Error, ErrorKind, Result};
 pub use nixb_macros::attrset;
-use nixb_result::{Error, ErrorKind, Result};
 
 use crate::callable::{Callable, NixLambda};
 use crate::context::{AttrsetBuilder, Context};

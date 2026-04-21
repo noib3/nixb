@@ -5,8 +5,8 @@ use core::ffi::c_uint;
 use core::ops::Deref;
 use core::ptr::{self, NonNull};
 
+use nixb_error::Result;
 pub use nixb_macros::list;
-use nixb_result::Result;
 
 use crate::context::{Context, ListBuilder};
 use crate::error::TypeMismatchError;

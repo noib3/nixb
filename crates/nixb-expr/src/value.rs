@@ -8,7 +8,7 @@ use core::marker::PhantomData;
 use core::ptr::{self, NonNull};
 use core::{fmt, slice};
 
-use nixb_result::{Error, Result};
+use nixb_error::{Error, Result};
 
 use crate::context::Context;
 use crate::error::{TryFromI64Error, TryIntoI64Error, TypeMismatchError};

@@ -4,7 +4,7 @@ use nixb_contexts::c_context::CContext;
 #[inline]
 pub fn init<const LOAD_CONFIG: bool>(
     ctx: &mut CContext,
-) -> nixb_result::Result<InitSentinel> {
+) -> nixb_error::Result<InitSentinel> {
     ctx.with_ptr(|ctx| {
         if LOAD_CONFIG {
             unsafe { nixb_sys::libstore_init(ctx) }

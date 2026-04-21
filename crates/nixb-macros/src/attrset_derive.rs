@@ -184,7 +184,7 @@ pub(crate) fn expand(input: DeriveInput) -> syn::Result<TokenStream> {
                 self,
                 dest: ::nixb::expr::value::UninitValue,
                 ctx: &mut ::nixb::expr::context::Context,
-            ) -> ::nixb::result::Result<()> {
+            ) -> ::nixb::Result<()> {
                 ::nixb::expr::attrset::Attrset::write(self, dest, ctx)
             }
         }

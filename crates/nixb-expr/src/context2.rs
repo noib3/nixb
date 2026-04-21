@@ -1,7 +1,7 @@
 use core::ffi::{CStr, c_uint};
 use core::ptr::{self, NonNull};
 
-use nixb_result::Result;
+use nixb_error::Result;
 
 use crate::attrset::{NixAttrset, NixDerivation};
 use crate::callable::{Callable, NixLambda};

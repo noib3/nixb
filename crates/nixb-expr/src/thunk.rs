@@ -4,7 +4,7 @@ use alloc::boxed::Box;
 use core::ffi::c_void;
 use core::ptr::NonNull;
 
-use nixb_result::{Error, Result};
+use nixb_error::{Error, Result};
 
 use crate::context::{Context, EvalState};
 use crate::into_result::IntoResult;

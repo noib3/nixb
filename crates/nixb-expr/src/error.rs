@@ -74,7 +74,7 @@ impl<Int: fmt::Debug + fmt::Display> core::error::Error
 {
 }
 
-impl<Int: fmt::Display> From<TryIntoI64Error<Int>> for nixb_result::Error {
+impl<Int: fmt::Display> From<TryIntoI64Error<Int>> for nixb_error::Error {
     #[inline]
     fn from(err: TryIntoI64Error<Int>) -> Self {
         Self::from_message(err)
@@ -106,14 +106,14 @@ impl<Int> fmt::Display for TryFromI64Error<Int> {
 
 impl<Int> core::error::Error for TryFromI64Error<Int> {}
 
-impl<Int> From<TryFromI64Error<Int>> for nixb_result::Error {
+impl<Int> From<TryFromI64Error<Int>> for nixb_error::Error {
     #[inline]
     fn from(err: TryFromI64Error<Int>) -> Self {
         Self::from_message(err)
     }
 }
 
-impl From<TypeMismatchError> for nixb_result::Error {
+impl From<TypeMismatchError> for nixb_error::Error {
     #[inline]
     fn from(err: TypeMismatchError) -> Self {
         Self::from_message(err)

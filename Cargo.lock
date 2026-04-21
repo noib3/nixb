@@ -155,9 +155,9 @@ name = "nixb"
 version = "0.1.0"
 dependencies = [
  "nixb-contexts",
+ "nixb-error",
  "nixb-expr",
  "nixb-plugin",
- "nixb-result",
  "nixb-store",
 ]
 
@@ -165,7 +165,7 @@ dependencies = [
 name = "nixb-contexts"
 version = "0.1.0"
 dependencies = [
- "nixb-result",
+ "nixb-error",
  "nixb-sys",
 ]
 
@@ -176,6 +176,13 @@ dependencies = [
  "cc",
  "nixb-sys",
  "pkg-config",
+]
+
+[[package]]
+name = "nixb-error"
+version = "0.1.0"
+dependencies = [
+ "nixb-sys",
 ]
 
 [[package]]
@@ -193,8 +200,8 @@ dependencies = [
  "either",
  "nixb-contexts",
  "nixb-cpp",
+ "nixb-error",
  "nixb-macros",
- "nixb-result",
  "nixb-sys",
  "rustc_version",
  "smallvec",
@@ -223,18 +230,11 @@ dependencies = [
 ]
 
 [[package]]
-name = "nixb-result"
-version = "0.1.0"
-dependencies = [
- "nixb-sys",
-]
-
-[[package]]
 name = "nixb-store"
 version = "0.1.0"
 dependencies = [
  "nixb-contexts",
- "nixb-result",
+ "nixb-error",
  "nixb-sys",
 ]
 
