@@ -20,33 +20,24 @@ impl Store {
     pub fn get_fs_closure<F>(
         &mut self,
         store_path: &StorePath,
-        fun: F,
+        mut fun: F,
         opts: GetFsClosureOpts,
     ) -> Result<()>
     where
-        F: FnMut(&mut Self, &StorePath),
+        F: FnMut(&StorePath),
     {
-        struct CallbackState<F> {
-            store: *mut nixb_sys::Store,
-            fun: F,
-        }
-
         unsafe extern "C" fn callback<F>(
-            ctx: *mut nixb_sys::c_context,
+            _ctx: *mut nixb_sys::c_context,
             userdata: *mut c_void,
             store_path: *const nixb_sys::StorePath,
         ) where
-            F: FnMut(&mut Store, &StorePath),
+            F: FnMut(&StorePath),
         {
-            let state = unsafe { &mut *userdata.cast::<CallbackState<F>>() };
-            let mut this = Store::new(CContext::new(ctx), state.store);
+            let fun = unsafe { &mut *userdata.cast::<F>() };
             let store_path = StorePath::new(store_path.cast_mut());
-            (state.fun)(&mut this, &store_path);
-            mem::forget(this);
+            (fun)(&store_path);
             mem::forget(store_path);
         }
-
-        let mut state = CallbackState { store: self.inner, fun };
 
         self.ctx.with_ptr(|ctx| unsafe {
             nixb_sys::store_get_fs_closure(
@@ -56,7 +47,7 @@ impl Store {
                 opts.flip_direction,
                 opts.include_outputs,
                 opts.include_derivers,
-                (&mut state as *mut CallbackState<_>).cast(),
+                (&mut fun as *mut F).cast(),
                 Some(callback::<F>),
             );
         })
