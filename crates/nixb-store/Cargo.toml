@@ -12,7 +12,7 @@ nix-2-35 = ["nix-2-34", "nixb-cpp/nix-2-35", "nixb-sys/nix-2-35"]
 
 [dependencies]
 nixb-contexts = { workspace = true, features = ["c"] }
-nixb-cpp = { workspace = true }
+nixb-cpp = { workspace = true, features = ["store"] }
 nixb-error = { workspace = true }
 nixb-sys = { workspace = true }
 

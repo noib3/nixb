@@ -6,6 +6,8 @@ authors.workspace = true
 license.workspace = true
 
 [features]
+expr = []
+store = []
 nix-2-33 = ["nixb-sys/nix-2-33"]
 nix-2-34 = ["nix-2-33", "nixb-sys/nix-2-34"]
 nix-2-35 = ["nix-2-34", "nixb-sys/nix-2-35"]

@@ -17,7 +17,7 @@ std = []
 
 [dependencies]
 nixb-contexts = { workspace = true }
-nixb-cpp = { workspace = true }
+nixb-cpp = { workspace = true, features = ["expr"] }
 nixb-error = { workspace = true }
 nixb-macros = { workspace = true }
 nixb-sys = { workspace = true }

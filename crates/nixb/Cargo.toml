@@ -16,18 +16,21 @@ nix-2-33 = [
   "nixb-contexts/nix-2-33",
   "nixb-expr?/nix-2-33",
   "nixb-plugin?/nix-2-33",
+  "nixb-store?/nix-2-33",
 ]
 nix-2-34 = [
   "nix-2-33",
   "nixb-contexts/nix-2-34",
   "nixb-expr?/nix-2-34",
   "nixb-plugin?/nix-2-34",
+  "nixb-store?/nix-2-34",
 ]
 nix-2-35 = [
   "nix-2-34",
   "nixb-contexts/nix-2-35",
   "nixb-expr?/nix-2-35",
   "nixb-plugin?/nix-2-35",
+  "nixb-store?/nix-2-35",
 ]
 
 # Module-enabling features.
