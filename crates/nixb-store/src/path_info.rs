@@ -236,6 +236,14 @@ impl PathInfo {
     }
 }
 
+// SAFETY: CContext is Send, and nix_path_info is a ref-counted handle wrapping
+// a nix::ValidPathInfo, which can be moved across threads.
+unsafe impl Send for PathInfo {}
+
+// SAFETY: &PathInfo does not permit calling into Nix: the raw pointer is
+// private, and all methods require `&mut self`.
+unsafe impl Sync for PathInfo {}
+
 impl Drop for PathInfo {
     fn drop(&mut self) {
         unsafe { nixb_sys::path_info_free(self.inner) };
