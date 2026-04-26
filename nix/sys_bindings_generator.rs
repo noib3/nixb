@@ -67,7 +67,9 @@ fn main() -> Result<(), String> {
 
     let bindings = builder
         .generate()
-        .map_err(|err| format!("Couldn't generate bindings: {err}"))?;
+        .map_err(|err| format!("Couldn't generate bindings: {err}"))?
+        .to_string()
+        .replace("#[link_name = \"\\u{1}_nix_", "#[link_name = \"nix_");
 
     let output_file = Path::new(&output_file);
 
@@ -80,7 +82,7 @@ fn main() -> Result<(), String> {
         })?;
     }
 
-    fs::write(output_file, bindings.to_string()).map_err(|err| {
+    fs::write(output_file, bindings).map_err(|err| {
         format!(
             "Couldn't write generated bindings to {}: {err}",
             output_file.display()
