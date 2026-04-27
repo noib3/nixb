@@ -1,4 +1,4 @@
-use nixb_contexts::c_context::CContext;
+use nixb_c_context::CContext;
 
 /// TODO: docs.
 #[inline]

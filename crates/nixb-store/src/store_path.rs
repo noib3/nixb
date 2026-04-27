@@ -1,7 +1,7 @@
 use core::ffi::{c_char, c_uint, c_void};
 use core::slice;
 
-use nixb_contexts::c_context::CContext;
+use nixb_c_context::CContext;
 use nixb_error::Result;
 
 /// TODO: docs.

@@ -3,7 +3,7 @@
 use core::ffi::{CStr, c_void};
 use core::{mem, ptr};
 
-use nixb_contexts::c_context::CContext;
+use nixb_c_context::CContext;
 use nixb_error::Result;
 
 use crate::{GetFsClosureOpts, InitSentinel, StoreParam, StorePath};

@@ -39,7 +39,7 @@ pub(crate) fn expand(input: DeriveInput) -> syn::Result<TokenStream> {
             #[inline]
             fn try_from_value(
                 #value: ::nixb::value::NixValue<::nixb::value::Borrowed<#lifetime>>,
-                #ctx: &mut ::nixb::context::Context,
+                #ctx: &mut ::nixb::Context,
             ) -> ::nixb::error::Result<Self> {
                 let #attrset = ::nixb::attrset::NixAttrset::<_>::try_from_value(
                     #value, #ctx,

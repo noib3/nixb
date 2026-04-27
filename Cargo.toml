@@ -25,7 +25,7 @@ syn = "2"
 
 # Internal dependencies.
 nixb = { path = "./crates/nixb", default-features = false }
-nixb-contexts = { path = "./crates/nixb-contexts" }
+nixb-c-context = { path = "./crates/nixb-c-context" }
 nixb-cpp = { path = "./crates/nixb-cpp" }
 nixb-error = { path = "./crates/nixb-error" }
 nixb-expr = { path = "./crates/nixb-expr" }

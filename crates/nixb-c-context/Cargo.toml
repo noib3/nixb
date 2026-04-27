@@ -1,16 +1,13 @@
 [package]
-name = "nixb-error"
+name = "nixb-c-context"
 version.workspace = true
 edition.workspace = true
 authors.workspace = true
 license.workspace = true
 
-[features]
-default = ["std"]
-std = []
-
 [dependencies]
-# We only need nixb-sys for the err_NIX_ERR_* error codes. They're unlikely to
+nixb-error = { workspace = true }
+# We only need nixb-sys for a very limited set of bindings which are unlikely to
 # change between releases, so we can just pick an arbitrary Nix version.
 nixb-sys = { workspace = true, features = ["nix-2-34"] }
 

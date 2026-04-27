@@ -52,13 +52,10 @@ impl Drop for CContext {
 }
 
 fn check_err(ctx: *mut nixb_sys::c_context) -> nixb_error::Result<()> {
-    let kind = match unsafe { nixb_sys::err_code(ctx) } {
-        nixb_sys::err_NIX_OK => return Ok(()),
-        nixb_sys::err_NIX_ERR_UNKNOWN => nixb_error::ErrorKind::Unknown,
-        nixb_sys::err_NIX_ERR_OVERFLOW => nixb_error::ErrorKind::Overflow,
-        nixb_sys::err_NIX_ERR_KEY => nixb_error::ErrorKind::Key,
-        nixb_sys::err_NIX_ERR_NIX_ERROR => nixb_error::ErrorKind::Nix,
-        other => unreachable!("invalid error code: {other}"),
+    let Some(kind) =
+        nixb_error::ErrorKind::from_code(unsafe { nixb_sys::err_code(ctx) })
+    else {
+        return Ok(());
     };
 
     let mut err_msg_len = 0;

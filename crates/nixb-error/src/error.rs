@@ -115,6 +115,19 @@ impl ErrorKind {
             Self::Nix => nixb_sys::err_NIX_ERR_NIX_ERROR,
         }
     }
+
+    /// TODO: docs.
+    #[inline]
+    pub fn from_code(err_code: nixb_sys::err) -> Option<Self> {
+        match err_code {
+            nixb_sys::err_NIX_OK => None,
+            nixb_sys::err_NIX_ERR_UNKNOWN => Some(Self::Unknown),
+            nixb_sys::err_NIX_ERR_OVERFLOW => Some(Self::Overflow),
+            nixb_sys::err_NIX_ERR_KEY => Some(Self::Key),
+            nixb_sys::err_NIX_ERR_NIX_ERROR => Some(Self::Nix),
+            other => unreachable!("unknown error code: {other}"),
+        }
+    }
 }
 
 impl fmt::Display for Error {

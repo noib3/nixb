@@ -154,7 +154,7 @@ checksum = "f52b00d39961fc5b2736ea853c9cc86238e165017a493d1d5c8eac6bdc4cc273"
 name = "nixb"
 version = "0.1.0"
 dependencies = [
- "nixb-contexts",
+ "nixb-c-context",
  "nixb-error",
  "nixb-expr",
  "nixb-plugin",
@@ -162,7 +162,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "nixb-contexts"
+name = "nixb-c-context"
 version = "0.1.0"
 dependencies = [
  "nixb-error",
@@ -198,7 +198,7 @@ version = "0.1.0"
 dependencies = [
  "compact_str",
  "either",
- "nixb-contexts",
+ "nixb-c-context",
  "nixb-cpp",
  "nixb-error",
  "nixb-macros",
@@ -233,7 +233,7 @@ dependencies = [
 name = "nixb-store"
 version = "0.1.0"
 dependencies = [
- "nixb-contexts",
+ "nixb-c-context",
  "nixb-cpp",
  "nixb-error",
  "nixb-sys",
