@@ -2,8 +2,10 @@
 
 use alloc::boxed::Box;
 use core::ffi::c_void;
+use core::mem;
 use core::ptr::NonNull;
 
+use nixb_c_context::CContext;
 use nixb_error::{Error, Result};
 
 use crate::context::{Context, EvalState};
@@ -67,28 +69,26 @@ pub trait Thunk {
         Self::Output: IntoValue,
     {
         unsafe extern "C" fn on_force<Th>(
-            ctx: *mut nixb_sys::c_context,
-            state: *mut nixb_sys::EvalState,
-            dest: *mut nixb_sys::Value,
+            ctx_raw: *mut nixb_sys::c_context,
+            state_raw: *mut nixb_sys::EvalState,
+            dest_raw: *mut nixb_sys::Value,
             userdata: *mut c_void,
         ) where
             Th: Thunk + 'static,
             Th::Output: IntoValue,
         {
-            let Some(ctx) = NonNull::new(ctx) else {
-                panic!("received NULL `nix_c_context` pointer in thunk force");
-            };
-            let Some(state) = NonNull::new(state) else {
+            let c_context = CContext::new(ctx_raw);
+            let Some(state) = NonNull::new(state_raw) else {
                 panic!("received NULL `EvalState` pointer in thunk force");
             };
-            let Some(dest) = NonNull::new(dest) else {
+            let Some(dest) = NonNull::new(dest_raw) else {
                 panic!("received NULL `Value` pointer in thunk force");
             };
             // SAFETY: dest is guaranteed to be a valid pointer to an
             // uninitialized Value.
             let dest = unsafe { UninitValue::new(dest) };
 
-            let mut context = Context::new(ctx, EvalState::new(state));
+            let mut ctx = Context::new(c_context, EvalState::new(state));
 
             // SAFETY:
             // - userdata is a `*mut Th` created by `Box::into_raw`;
@@ -96,19 +96,21 @@ pub trait Thunk {
             //   only called once;
             let thunk = unsafe { Box::from_raw(userdata.cast::<Th>()) };
 
-            let result = thunk.force(&mut context).and_then(|output| {
-                output.into_value(&mut context).write(dest, &mut context)
+            let result = thunk.force(&mut ctx).and_then(|output| {
+                output.into_value(&mut ctx).write(dest, &mut ctx)
             });
 
             if let Err(err) = result {
                 unsafe {
                     nixb_sys::set_err_msg(
-                        ctx.as_ptr(),
+                        ctx_raw,
                         err.kind().code(),
                         err.message().as_ptr(),
                     );
                 }
             }
+
+            mem::forget(ctx.into_inner());
         }
 
         unsafe extern "C" fn on_drop<Th>(userdata: *mut c_void) {

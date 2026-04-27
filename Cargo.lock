@@ -223,6 +223,7 @@ dependencies = [
  "libc",
  "libloading",
  "memchr",
+ "nixb-c-context",
  "nixb-expr",
  "nixb-macros",
  "nixb-sys",

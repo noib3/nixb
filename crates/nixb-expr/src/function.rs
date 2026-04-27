@@ -6,6 +6,7 @@ use core::marker::PhantomData;
 use core::ptr::{self, NonNull};
 use core::{any, mem};
 
+use nixb_c_context::CContext;
 use nixb_error::{Error, Result};
 
 use crate::IntoResult;
@@ -88,9 +89,7 @@ pub trait Function {
             args_raw: *mut *mut nixb_sys::Value,
             dest_raw: *mut nixb_sys::Value,
         ) {
-            let Some(ctx_ptr) = NonNull::new(ctx_raw) else {
-                panic!("received NULL `nix_c_context` pointer in primop call");
-            };
+            let c_context = CContext::new(ctx_raw);
 
             let Some(state_ptr) = NonNull::new(state_raw) else {
                 panic!("received NULL `EvalState` pointer in primop call");
@@ -114,7 +113,7 @@ pub trait Function {
                 panic!("received NULL `Value` pointer in primop call");
             };
 
-            let mut ctx = Context::new(ctx_ptr, EvalState::new(state_ptr));
+            let mut ctx = Context::new(c_context, EvalState::new(state_ptr));
 
             let args_list = ArgsList { args_ptr, _lifetime: PhantomData };
 
@@ -152,6 +151,8 @@ pub trait Function {
                     );
                 }
             }
+
+            mem::forget(ctx.into_inner());
         }
 
         callback::<Self>

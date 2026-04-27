@@ -13,6 +13,7 @@ nix-2-35 = ["nix-2-34", "nixb-expr/nix-2-35", "nixb-sys/nix-2-35"]
 std = []
 
 [dependencies]
+nixb-c-context = { workspace = true }
 nixb-expr = { workspace = true }
 nixb-macros = { workspace = true }
 nixb-sys = { workspace = true }

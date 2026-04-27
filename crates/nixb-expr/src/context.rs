@@ -1,12 +1,11 @@
 //! TODO: docs.
 
-use alloc::borrow::ToOwned;
 use core::ffi::CStr;
 use core::marker::PhantomData;
 use core::ops::{Deref, DerefMut};
 use core::ptr::{self, NonNull};
-use core::slice;
 
+use nixb_c_context::CContext;
 use nixb_error::{Error, ErrorKind, Result};
 
 use crate::attrset::NixAttrset;
@@ -22,7 +21,7 @@ use crate::value::{
 
 /// TODO: docs.
 pub struct Context<'state, State = EvalState<'state>> {
-    inner: ContextInner,
+    inner: CContext,
     state: State,
     _lifetime: PhantomData<&'state ()>,
 }
@@ -42,10 +41,6 @@ pub(crate) struct ListBuilder<'ctx, 'eval> {
     inner: NonNull<nixb_sys::ListBuilder>,
     context: &'ctx mut Context<'eval>,
     index: usize,
-}
-
-struct ContextInner {
-    ptr: NonNull<nixb_sys::c_context>,
 }
 
 impl<'eval> Context<'eval, EvalState<'eval>> {
@@ -116,11 +111,13 @@ impl<'eval> Context<'eval, EvalState<'eval>> {
                 nixb_cpp::make_bindings_builder(self.state.as_ptr(), capacity);
 
             #[cfg(feature = "nix-2-34")]
-            let builder_ptr = nixb_sys::make_bindings_builder(
-                self.inner.as_ptr(),
-                self.state.as_ptr(),
-                capacity,
-            );
+            let builder_ptr = self.inner.with_ptr(|ptr| {
+                nixb_sys::make_bindings_builder(
+                    ptr,
+                    self.state.as_ptr(),
+                    capacity,
+                )
+            })?;
 
             match NonNull::new(builder_ptr) {
                 Some(builder_ptr) => {
@@ -146,11 +143,9 @@ impl<'eval> Context<'eval, EvalState<'eval>> {
                 nixb_cpp::make_list_builder(self.state.as_ptr(), capacity);
 
             #[cfg(feature = "nix-2-34")]
-            let builder_ptr = nixb_sys::make_list_builder(
-                self.inner.as_ptr(),
-                self.state.as_ptr(),
-                capacity,
-            );
+            let builder_ptr = self.inner.with_ptr(|ptr| {
+                nixb_sys::make_list_builder(ptr, self.state.as_ptr(), capacity)
+            })?;
 
             match NonNull::new(builder_ptr) {
                 Some(builder_ptr) => Ok(ListBuilder {
@@ -173,14 +168,15 @@ impl<'eval> Context<'eval, EvalState<'eval>> {
 }
 
 impl<State> Context<'_, State> {
-    /// TODO: docs.
     #[inline]
-    pub fn new(ctx_ptr: NonNull<nixb_sys::c_context>, state: State) -> Self {
-        Self {
-            inner: ContextInner::new(ctx_ptr),
-            state,
-            _lifetime: PhantomData,
-        }
+    #[doc(hidden)]
+    pub fn new(inner: CContext, state: State) -> Self {
+        Self { inner, state, _lifetime: PhantomData }
+    }
+
+    #[inline]
+    pub(crate) fn into_inner(self) -> CContext {
+        self.inner
     }
 
     /// TODO: docs.
@@ -189,7 +185,7 @@ impl<State> Context<'_, State> {
         &mut self,
         fun: impl FnOnce(*mut nixb_sys::c_context) -> T,
     ) -> Result<T> {
-        self.inner.with_raw(fun)
+        self.inner.with_ptr(fun)
     }
 
     /// TODO: docs.
@@ -198,7 +194,7 @@ impl<State> Context<'_, State> {
         &mut self,
         fun: impl FnOnce(*mut nixb_sys::c_context, &mut State) -> T,
     ) -> Result<T> {
-        self.inner.with_raw(|raw_ctx| fun(raw_ctx, &mut self.state))
+        self.inner.with_ptr(|raw_ctx| fun(raw_ctx, &mut self.state))
     }
 }
 
@@ -331,53 +327,6 @@ impl<'eval> ListBuilder<'_, 'eval> {
 
         self.index += 1;
         Ok(())
-    }
-}
-
-impl ContextInner {
-    #[inline]
-    fn as_ptr(&mut self) -> *mut nixb_sys::c_context {
-        self.ptr.as_ptr()
-    }
-
-    #[inline]
-    fn check_err(&mut self) -> Result<()> {
-        let kind = match unsafe { nixb_sys::err_code(self.as_ptr()) } {
-            nixb_sys::err_NIX_OK => return Ok(()),
-            nixb_sys::err_NIX_ERR_UNKNOWN => ErrorKind::Unknown,
-            nixb_sys::err_NIX_ERR_OVERFLOW => ErrorKind::Overflow,
-            nixb_sys::err_NIX_ERR_KEY => ErrorKind::Key,
-            nixb_sys::err_NIX_ERR_NIX_ERROR => ErrorKind::Nix,
-            other => unreachable!("invalid error code: {other}"),
-        };
-        let mut err_msg_len = 0;
-        let err_msg_ptr = unsafe {
-            nixb_sys::err_msg(ptr::null_mut(), self.as_ptr(), &mut err_msg_len)
-        };
-        let bytes = unsafe {
-            slice::from_raw_parts(
-                err_msg_ptr as *const u8,
-                (err_msg_len + 1) as usize,
-            )
-        };
-        let err_msg = unsafe { CStr::from_bytes_with_nul_unchecked(bytes) };
-        Err(Error::new(kind, err_msg.to_owned()))
-    }
-
-    #[inline]
-    fn new(inner: NonNull<nixb_sys::c_context>) -> Self {
-        Self { ptr: inner }
-    }
-
-    /// Same as [`with_raw`](Self::with_raw), but provides the callback with a
-    /// raw pointer instead of a `NonNull`.
-    #[inline]
-    fn with_raw<T>(
-        &mut self,
-        fun: impl FnOnce(*mut nixb_sys::c_context) -> T,
-    ) -> Result<T> {
-        let ret = fun(self.as_ptr());
-        self.check_err().map(|()| ret)
     }
 }
 
