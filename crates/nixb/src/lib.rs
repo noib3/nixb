@@ -1,8 +1,6 @@
 //! TODO: docs.
 
 #[doc(inline)]
-pub use nixb_c_context::CContext;
-#[doc(inline)]
 pub use nixb_error::{Error, ErrorKind, Result};
 #[cfg(feature = "expr")]
 #[doc(inline)]

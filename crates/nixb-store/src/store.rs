@@ -56,11 +56,11 @@ impl Store {
     /// TODO: docs.
     #[inline]
     pub fn open(
-        _: InitSentinel,
+        init: InitSentinel,
         uri: impl AsRef<CStr>,
         _params: impl IntoIterator<Item = StoreParam>,
-        mut ctx: CContext,
     ) -> Result<Self> {
+        let mut ctx = init.ctx;
         let store = ctx.with_ptr(|ctx| unsafe {
             nixb_sys::store_open(ctx, uri.as_ref().as_ptr(), ptr::null_mut())
         })?;
