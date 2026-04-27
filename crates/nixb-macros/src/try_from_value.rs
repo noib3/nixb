@@ -35,13 +35,13 @@ pub(crate) fn expand(input: DeriveInput) -> syn::Result<TokenStream> {
     let struct_name = &input.ident;
 
     Ok(quote! {
-        impl<#lifetime> ::nixb::value::TryFromValue<::nixb::value::NixValue<::nixb::value::Borrowed<#lifetime>>> for #struct_name #lifetime_generic {
+        impl<#lifetime> ::nixb::expr::value::TryFromValue<::nixb::expr::value::NixValue<::nixb::expr::value::Borrowed<#lifetime>>> for #struct_name #lifetime_generic {
             #[inline]
             fn try_from_value(
-                #value: ::nixb::value::NixValue<::nixb::value::Borrowed<#lifetime>>,
-                #ctx: &mut ::nixb::Context,
-            ) -> ::nixb::error::Result<Self> {
-                let #attrset = ::nixb::attrset::NixAttrset::<_>::try_from_value(
+                #value: ::nixb::expr::value::NixValue<::nixb::expr::value::Borrowed<#lifetime>>,
+                #ctx: &mut ::nixb::expr::context::Context,
+            ) -> ::nixb::Result<Self> {
+                let #attrset = ::nixb::expr::attrset::NixAttrset::<_>::try_from_value(
                     #value, #ctx,
                 )?;
                 #try_from_attrset_impl
@@ -154,7 +154,7 @@ fn try_from_attrset_impl(
             Some(attr) => attr.default_expr(),
             None => quote! {
                 return ::core::result::Result::Err(
-                    ::nixb::attrset::MissingAttributeError {
+                    ::nixb::expr::attrset::MissingAttributeError {
                         key: #key_name,
                     }
                     .into()

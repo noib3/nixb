@@ -168,6 +168,15 @@ impl<'eval> Context<'eval, EvalState<'eval>> {
 }
 
 impl<State> Context<'_, State> {
+    /// TODO: docs.
+    #[inline]
+    pub fn with_raw<T>(
+        &mut self,
+        fun: impl FnOnce(*mut nixb_sys::c_context) -> T,
+    ) -> Result<T> {
+        self.inner.with_ptr(fun)
+    }
+
     #[inline]
     #[doc(hidden)]
     pub fn new(inner: CContext, state: State) -> Self {
@@ -177,15 +186,6 @@ impl<State> Context<'_, State> {
     #[inline]
     pub(crate) fn into_inner(self) -> CContext {
         self.inner
-    }
-
-    /// TODO: docs.
-    #[inline]
-    pub fn with_raw<T>(
-        &mut self,
-        fun: impl FnOnce(*mut nixb_sys::c_context) -> T,
-    ) -> Result<T> {
-        self.inner.with_ptr(fun)
     }
 
     /// TODO: docs.

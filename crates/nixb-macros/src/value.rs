@@ -36,7 +36,7 @@ pub(crate) fn expand(input: DeriveInput) -> syn::Result<TokenStream> {
     let dest = Ident::new("__dest", Span::call_site());
     let ctx = Ident::new("__ctx", Span::call_site());
 
-    let value_path: syn::Path = parse_quote!(::nixb::value::Value);
+    let value_path: syn::Path = parse_quote!(::nixb::expr::value::Value);
 
     // Generate match arms for `kind()` method
     let kind_arms = variants.iter().map(|(variant_name, _field_type)| {
@@ -76,9 +76,9 @@ pub(crate) fn expand(input: DeriveInput) -> syn::Result<TokenStream> {
     };
 
     Ok(quote! {
-        impl #impl_generics ::nixb::value::Value for #enum_name #ty_generics #extended_where_clause {
+        impl #impl_generics ::nixb::expr::value::Value for #enum_name #ty_generics #extended_where_clause {
             #[inline]
-            fn kind(&self) -> ::nixb::value::ValueKind {
+            fn kind(&self) -> ::nixb::expr::value::ValueKind {
                 match self {
                     #(#kind_arms)*
                 }
@@ -87,9 +87,9 @@ pub(crate) fn expand(input: DeriveInput) -> syn::Result<TokenStream> {
             #[inline]
             fn write(
                 self,
-                #dest: ::nixb::value::UninitValue,
-                #ctx: &mut ::nixb::CContext,
-            ) -> ::nixb::prelude::Result<()> {
+                #dest: ::nixb::expr::value::UninitValue,
+                #ctx: &mut ::nixb::expr::context::Context,
+            ) -> ::nixb::Result<()> {
                 match self {
                     #(#write_arms)*
                 }
