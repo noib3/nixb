@@ -9,13 +9,14 @@ use core::cell::OnceCell;
 use core::ffi::{CStr, c_uint};
 use core::marker::PhantomData;
 use core::ops::Deref;
-use core::ptr::NonNull;
+use core::ptr::{self, NonNull};
 use core::result::Result as CoreResult;
 use core::{fmt, mem};
 
 use nixb_error::{Error, ErrorKind, Result};
 pub use nixb_macros::attrset;
 
+use crate::Utf8CStr;
 use crate::callable::{Callable, NixLambda};
 use crate::context::{AttrsetBuilder, Context};
 use crate::error::TypeMismatchError;
@@ -34,7 +35,6 @@ use crate::value::{
     ValueOwner,
     Values,
 };
-use crate::{ExprContext, Utf8CStr};
 
 /// TODO: docs.
 pub trait Attrset {
@@ -380,14 +380,19 @@ impl<Owner: ValueOwner> NixAttrset<Owner> {
 
     /// Returns whether this attribute set is empty.
     #[inline]
-    pub fn is_empty(&self, ctx: &mut impl ExprContext) -> bool {
+    pub fn is_empty(&self, ctx: &mut Context) -> bool {
         self.len(ctx) == 0
     }
 
     /// Returns the number of attributes in this attribute set.
     #[inline]
-    pub fn len(&self, ctx: &mut impl ExprContext) -> c_uint {
-        ctx.get_attrs_size(self)
+    pub fn len(&self, _: &mut Context) -> c_uint {
+        // 'nix_get_attrs_size' errors when the value pointer is null or when
+        // the value is not initizialized, but having a NixValue guarantees
+        // neither of those can happen, so we can use a null context.
+        unsafe {
+            nixb_sys::get_attrs_size(ptr::null_mut(), self.inner.as_ptr())
+        }
     }
 
     #[inline]
@@ -467,9 +472,19 @@ impl<Owner: ValueOwner> NixAttrset<Owner> {
     fn get_value<'this>(
         &'this self,
         key: &CStr,
-        ctx: &mut impl ExprContext,
+        ctx: &mut Context,
     ) -> Option<NixValue<Owner::Borrow<'this>>> {
-        ctx.get_attr_byname_lazy(self, key)
+        let value_raw = unsafe {
+            nixb_cpp::get_attr_byname_lazy_no_incref(
+                self.inner.as_ptr(),
+                ctx.as_ptr(),
+                key.as_ptr(),
+            )
+        };
+
+        NonNull::new(value_raw)
+            .map(|ptr| unsafe { Owner::Borrow::new(ptr) })
+            .map(NixValue::new)
     }
 }
 
@@ -514,8 +529,31 @@ impl<Owner: ValueOwner> NixDerivation<Owner> {
 
     /// TODO: docs.
     #[inline(always)]
-    pub fn realise(&self, ctx: &mut impl ExprContext) -> Result<()> {
-        ctx.realise_derivation(self)
+    pub fn realise(&self, ctx: &mut Context) -> Result<()> {
+        let value = ctx
+            .eval::<NixLambda>(c"drv: \"${drv}\"")?
+            .call(self.inner.borrow(), ctx)?
+            .into_inner();
+
+        let realised_str = ctx.with_raw_and_state(|ctx, state| unsafe {
+            #[cfg(not(feature = "nix-2-34"))]
+            {
+                nixb_cpp::string_realise(
+                    ctx,
+                    state.as_ptr(),
+                    value.as_ptr(),
+                    true,
+                )
+            }
+            #[cfg(feature = "nix-2-34")]
+            nixb_sys::string_realise(ctx, state.as_ptr(), value.as_ptr(), true)
+        })?;
+
+        unsafe {
+            nixb_sys::realised_string_free(realised_str);
+        }
+
+        Ok(())
     }
 }
 
