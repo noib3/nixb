@@ -1,4 +1,4 @@
-use nixb::plugin::{ContextExt, Entrypoint};
+use nixb::plugin::Plugin;
 use nixb::prelude::*;
 
 /// A simple primop.
@@ -13,6 +13,6 @@ impl IntoValue for HelloWorld {
 }
 
 #[nixb::plugin::entry]
-fn hello_world(ctx: &mut Context<Entrypoint>) {
-    ctx.register_primop(HelloWorld);
+fn hello_world(plugin: &mut Plugin) {
+    plugin.register_primop(HelloWorld);
 }

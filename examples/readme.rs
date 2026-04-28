@@ -1,4 +1,4 @@
-use nixb::plugin::{ContextExt, Entrypoint};
+use nixb::plugin::Plugin;
 use nixb::prelude::*;
 
 /// A cool Nix plugin.
@@ -27,6 +27,6 @@ impl IntoValue for MyPlugin {
 }
 
 #[nixb::plugin::entry]
-fn myplugin(ctx: &mut Context<Entrypoint>) {
-    ctx.register_primop(MyPlugin);
+fn myplugin(plugin: &mut Plugin) {
+    plugin.register_primop(MyPlugin);
 }

@@ -20,10 +20,9 @@ use crate::value::{
 };
 
 /// TODO: docs.
-pub struct Context<'state, State = EvalState<'state>> {
+pub struct Context<'eval> {
     inner: CContext,
-    state: State,
-    _lifetime: PhantomData<&'state ()>,
+    state: EvalState<'eval>,
 }
 
 /// TODO: docs.
@@ -43,7 +42,7 @@ pub(crate) struct ListBuilder<'ctx, 'eval> {
     index: usize,
 }
 
-impl<'eval> Context<'eval, EvalState<'eval>> {
+impl<'eval> Context<'eval> {
     /// Returns the global `builtins` attribute set.
     ///
     /// This provides access to all built-in functions like `fetchGit`,
@@ -167,10 +166,19 @@ impl<'eval> Context<'eval, EvalState<'eval>> {
     }
 }
 
-impl<State> Context<'_, State> {
-    /// TODO: docs.
+impl<'eval> Context<'eval> {
     #[inline]
-    pub fn with_raw<T>(
+    pub(crate) fn into_inner(self) -> CContext {
+        self.inner
+    }
+
+    #[inline]
+    pub(crate) fn new(inner: CContext, state: EvalState<'eval>) -> Self {
+        Self { inner, state }
+    }
+
+    #[inline]
+    pub(crate) fn with_raw<T>(
         &mut self,
         fun: impl FnOnce(*mut nixb_sys::c_context) -> T,
     ) -> Result<T> {
@@ -178,21 +186,9 @@ impl<State> Context<'_, State> {
     }
 
     #[inline]
-    #[doc(hidden)]
-    pub fn new(inner: CContext, state: State) -> Self {
-        Self { inner, state, _lifetime: PhantomData }
-    }
-
-    #[inline]
-    pub(crate) fn into_inner(self) -> CContext {
-        self.inner
-    }
-
-    /// TODO: docs.
-    #[inline]
     pub(crate) fn with_raw_and_state<T>(
         &mut self,
-        fun: impl FnOnce(*mut nixb_sys::c_context, &mut State) -> T,
+        fun: impl FnOnce(*mut nixb_sys::c_context, &mut EvalState<'eval>) -> T,
     ) -> Result<T> {
         self.inner.with_ptr(|raw_ctx| fun(raw_ctx, &mut self.state))
     }
@@ -330,8 +326,8 @@ impl<'eval> ListBuilder<'_, 'eval> {
     }
 }
 
-impl<'state, State> Deref for Context<'state, State> {
-    type Target = State;
+impl<'eval> Deref for Context<'eval> {
+    type Target = EvalState<'eval>;
 
     #[inline]
     fn deref(&self) -> &Self::Target {
@@ -339,7 +335,7 @@ impl<'state, State> Deref for Context<'state, State> {
     }
 }
 
-impl<'state, State> DerefMut for Context<'state, State> {
+impl<'eval> DerefMut for Context<'eval> {
     #[inline]
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.state

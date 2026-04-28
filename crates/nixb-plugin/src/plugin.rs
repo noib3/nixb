@@ -1,25 +1,22 @@
 use core::ffi::CStr;
 use core::ptr;
 
-use nixb_expr::context::Context;
+use nixb_c_context::CContext;
 
 use crate::primop::PrimOp;
 
 /// TODO: docs.
-pub trait ContextExt {
-    /// Adds the given primop to the `builtins` attribute set.
-    fn register_primop<P: PrimOp>(&mut self, primop: P) -> &mut Self;
+pub struct Plugin {
+    ctx: CContext,
 }
 
-/// TODO: docs.
-pub struct Entrypoint {}
-
-impl ContextExt for Context<'_, Entrypoint> {
+impl Plugin {
+    /// TODO: docs.
     #[track_caller]
     #[inline]
-    fn register_primop<P: PrimOp>(&mut self, primop: P) -> &mut Self {
+    pub fn register_primop<P: PrimOp>(&mut self, primop: P) -> &mut Self {
         let try_block = || {
-            let primop_ptr = self.with_raw(|ctx| unsafe {
+            let primop_ptr = self.ctx.with_ptr(|ctx| unsafe {
                 nixb_sys::alloc_primop(
                     ctx,
                     Some(P::callback()),
@@ -31,11 +28,11 @@ impl ContextExt for Context<'_, Entrypoint> {
                 )
             })?;
 
-            self.with_raw(|ctx| unsafe {
+            self.ctx.with_ptr(|ctx| unsafe {
                 nixb_sys::register_primop(ctx, primop_ptr)
             })?;
 
-            self.with_raw(|ctx| unsafe {
+            self.ctx.with_ptr(|ctx| unsafe {
                 nixb_sys::gc_decref(ctx, primop_ptr.cast())
             })
         };
@@ -45,5 +42,11 @@ impl ContextExt for Context<'_, Entrypoint> {
         }
 
         self
+    }
+
+    #[doc(hidden)]
+    #[inline]
+    pub fn new(ctx: CContext) -> Self {
+        Self { ctx }
     }
 }

@@ -4,12 +4,13 @@
 
 extern crate alloc;
 
-mod context;
 #[cfg(feature = "dlopen")]
 mod dlopen;
 mod entrypoint;
+mod plugin;
 pub mod primop;
-pub use context::{ContextExt, Entrypoint};
+
 #[doc(hidden)]
 pub use entrypoint::entrypoint;
 pub use nixb_macros::{PrimOp, entry};
+pub use plugin::Plugin;
