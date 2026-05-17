@@ -401,6 +401,50 @@ impl Store {
         Ok(state.ret.expect("callback was called"))
     }
 
+    /// Realises the given [`StorePath`], calling the given function once for
+    /// each realised output with its name and the realised output path.
+    ///
+    /// This method is blocking.
+    ///
+    /// On error, the function is never called.
+    #[inline]
+    pub fn realise<F>(
+        &mut self,
+        store_path: &StorePath,
+        mut fun: F,
+    ) -> Result<()>
+    where
+        F: FnMut(&str, &StorePath),
+    {
+        unsafe extern "C" fn callback<F>(
+            userdata: *mut c_void,
+            outname: *const c_char,
+            out: *const nixb_sys::StorePath,
+        ) where
+            F: FnMut(&str, &StorePath),
+        {
+            let fun = unsafe { &mut *userdata.cast::<F>() };
+            let outname = unsafe { CStr::from_ptr(outname) };
+            let outname =
+                outname.to_str().expect("Nix output names are valid UTF-8");
+            let out = StorePath::new(out.cast_mut());
+            (fun)(outname, &out);
+            mem::forget(out);
+        }
+
+        self.ctx.with_ptr(|ctx| unsafe {
+            nixb_sys::store_realise(
+                ctx,
+                self.inner,
+                store_path.as_ptr(),
+                (&mut fun as *mut F).cast(),
+                Some(callback::<F>),
+            )
+        })?;
+
+        Ok(())
+    }
+
     #[inline]
     fn new(ctx: CContext, store: *mut nixb_sys::Store) -> Self {
         Self { ctx, inner: store }
