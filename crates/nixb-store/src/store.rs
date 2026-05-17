@@ -34,9 +34,27 @@ impl Store {
             .map(StorePath::new)
     }
 
+    /// Creates a [`NixDerivation`] from a JSON representation of that
+    /// derivation.
+    #[inline]
+    pub fn derivation_from_json(
+        &mut self,
+        json: impl AsRef<CStr>,
+    ) -> Result<NixDerivation> {
+        self.ctx
+            .with_ptr(|ctx| unsafe {
+                nixb_sys::derivation_from_json(
+                    ctx,
+                    self.inner,
+                    json.as_ref().as_ptr(),
+                )
+            })
+            .map(NixDerivation::new)
+    }
+
     /// TODO: docs.
     #[inline]
-    pub fn drv_from_store_path(
+    pub fn derivation_from_store_path(
         &mut self,
         store_path: &StorePath,
     ) -> Result<NixDerivation> {
