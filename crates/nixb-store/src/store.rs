@@ -1,6 +1,6 @@
 //! TODO: docs.
 
-use core::ffi::{CStr, c_void};
+use core::ffi::{CStr, c_char, c_uint, c_void};
 use core::{mem, ptr};
 
 use nixb_c_context::CContext;
@@ -159,6 +159,49 @@ impl Store {
         self.ctx.with_ptr(|ctx| unsafe {
             nixb_sys::store_is_valid_path(ctx, self.inner, store_path.as_ptr())
         })
+    }
+
+    /// Calls the given function with the `storeDir` of this store (typically
+    /// `"/nix/store"`).
+    #[inline]
+    pub fn get_storedir<T, F>(&mut self, fun: F) -> Result<T>
+    where
+        F: FnOnce(&str) -> T,
+    {
+        struct CallbackState<F, T> {
+            fun: Option<F>,
+            ret: Option<T>,
+        }
+
+        unsafe extern "C" fn callback<F, T>(
+            start: *const c_char,
+            n: c_uint,
+            user_data: *mut c_void,
+        ) where
+            F: FnOnce(&str) -> T,
+        {
+            let bytes = unsafe {
+                core::slice::from_raw_parts(start.cast::<u8>(), n as usize)
+            };
+            let storedir = unsafe { str::from_utf8_unchecked(bytes) };
+            let state =
+                unsafe { &mut *user_data.cast::<CallbackState<F, T>>() };
+            let fun = state.fun.take().expect("it's set");
+            state.ret = Some(fun(storedir));
+        }
+
+        let mut state = CallbackState { fun: Some(fun), ret: None };
+
+        self.ctx.with_ptr(|ctx| unsafe {
+            nixb_sys::store_get_storedir(
+                ctx,
+                self.inner,
+                Some(callback::<F, T>),
+                (&mut state as *mut CallbackState<F, T>).cast(),
+            )
+        })?;
+
+        Ok(state.ret.expect("callback was called"))
     }
 
     /// TODO: docs.
