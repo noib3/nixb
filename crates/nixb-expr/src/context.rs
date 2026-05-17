@@ -3,7 +3,7 @@
 use core::ffi::CStr;
 use core::marker::PhantomData;
 use core::ops::{Deref, DerefMut};
-use core::ptr::{self, NonNull};
+use core::ptr::NonNull;
 
 use nixb_c_context::CContext;
 use nixb_error::{Error, ErrorKind, Result};
@@ -206,7 +206,7 @@ impl<'eval> EvalState<'eval> {
 
         #[cfg(feature = "nix-2-34")]
         let raw_ptr = unsafe {
-            nixb_sys::alloc_value(ptr::null_mut(), self.inner.as_ptr())
+            nixb_sys::alloc_value(core::ptr::null_mut(), self.inner.as_ptr())
         };
 
         let Some(non_null_ptr) = NonNull::new(raw_ptr) else {
@@ -353,5 +353,35 @@ impl<'eval> AsMut<Context<'eval>> for ListBuilder<'_, 'eval> {
     #[inline]
     fn as_mut(&mut self) -> &mut Context<'eval> {
         self.context
+    }
+}
+
+impl Drop for AttrsetBuilder<'_, '_> {
+    #[inline]
+    fn drop(&mut self) {
+        #[cfg(not(feature = "nix-2-34"))]
+        unsafe {
+            nixb_cpp::bindings_builder_free(self.inner.as_ptr());
+        }
+
+        #[cfg(feature = "nix-2-34")]
+        unsafe {
+            nixb_sys::bindings_builder_free(self.inner.as_ptr());
+        }
+    }
+}
+
+impl Drop for ListBuilder<'_, '_> {
+    #[inline]
+    fn drop(&mut self) {
+        #[cfg(not(feature = "nix-2-34"))]
+        unsafe {
+            nixb_cpp::list_builder_free(self.inner.as_ptr());
+        }
+
+        #[cfg(feature = "nix-2-34")]
+        unsafe {
+            nixb_sys::list_builder_free(self.inner.as_ptr());
+        }
     }
 }

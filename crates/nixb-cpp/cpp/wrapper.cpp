@@ -40,6 +40,9 @@ extern "C" void bindings_builder_insert(nix::BindingsBuilder *builder,
 
 extern "C" void make_attrs(nix::Value *v, nix::BindingsBuilder *builder) {
   v->mkAttrs(*builder);
+}
+
+extern "C" void bindings_builder_free(nix::BindingsBuilder *builder) {
   delete builder;
 }
 #endif
@@ -171,6 +174,9 @@ extern "C" void list_builder_insert(nix::ListBuilder *builder, size_t index,
 
 extern "C" void make_list(nix::Value *v, nix::ListBuilder *builder) {
   v->mkList(*builder);
+}
+
+extern "C" void list_builder_free(nix::ListBuilder *builder) {
   delete builder;
 }
 #endif

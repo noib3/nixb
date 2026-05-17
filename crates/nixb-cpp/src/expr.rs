@@ -29,9 +29,10 @@ unsafe extern "C" {
         value: *mut Value,
     );
 
+    /// Free a bindings builder.
+    pub fn bindings_builder_free(builder: *mut BindingsBuilder);
+
     /// Finalize the bindings builder into an attribute set value.
-    ///
-    /// This frees the builder automatically.
     pub fn make_attrs(ret: *mut Value, builder: *mut BindingsBuilder);
 }
 
@@ -132,9 +133,10 @@ unsafe extern "C" {
         value: *mut Value,
     );
 
+    /// Free a list builder.
+    pub fn list_builder_free(builder: *mut ListBuilder);
+
     /// Finalize the list builder into a list value.
-    ///
-    /// This frees the builder automatically.
     pub fn make_list(ret: *mut Value, builder: *mut ListBuilder);
 }
 
