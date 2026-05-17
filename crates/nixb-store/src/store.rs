@@ -1,5 +1,7 @@
 //! TODO: docs.
 
+use alloc::ffi::CString;
+use alloc::vec::Vec;
 use core::ffi::{CStr, c_char, c_uint, c_void};
 use core::{mem, ptr};
 
@@ -299,16 +301,42 @@ impl Store {
 
     /// TODO: docs.
     #[inline]
-    pub fn open(
-        init: InitSentinel,
+    pub fn open<'a>(
+        mut init: InitSentinel,
         uri: impl AsRef<CStr>,
-        _params: impl IntoIterator<Item = StoreParam>,
+        store_params: impl IntoIterator<Item = StoreParam<'a>>,
     ) -> Result<Self> {
-        let mut ctx = init.ctx;
-        let store = ctx.with_ptr(|ctx| unsafe {
-            nixb_sys::store_open(ctx, uri.as_ref().as_ptr(), ptr::null_mut())
+        struct ParamPair {
+            _value: CString,
+            pair: [*const c_char; 2],
+        }
+
+        let mut param_pairs = store_params
+            .into_iter()
+            .map(|param| {
+                let value = CString::new(param.value())?;
+                let pair = [param.key().as_ptr(), value.as_ptr()];
+                Ok(ParamPair { _value: value, pair })
+            })
+            .collect::<Result<Vec<_>>>()?;
+
+        let mut params = param_pairs
+            .iter_mut()
+            .map(|param| param.pair.as_mut_ptr())
+            .collect::<Vec<_>>();
+
+        let params_ptr = if params.is_empty() {
+            ptr::null_mut()
+        } else {
+            params.push(ptr::null_mut());
+            params.as_mut_ptr()
+        };
+
+        let store = init.ctx.with_ptr(|ctx| unsafe {
+            nixb_sys::store_open(ctx, uri.as_ref().as_ptr(), params_ptr)
         })?;
-        Ok(Self::new(ctx, store))
+
+        Ok(Self::new(init.ctx, store))
     }
 
     /// TODO: docs.
