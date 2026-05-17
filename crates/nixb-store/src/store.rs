@@ -138,6 +138,24 @@ impl Store {
             .map(StorePath::new)
     }
 
+    /// Queries the full store path given the hash part of a valid store path.
+    /// Returns `Ok(None)` if the hash is valid but no matching path is found.
+    #[inline]
+    pub fn query_path_from_hash_part(
+        &mut self,
+        hash: impl AsRef<CStr>,
+    ) -> Result<Option<StorePath>> {
+        self.ctx
+            .with_ptr(|ctx| unsafe {
+                nixb_sys::store_query_path_from_hash_part(
+                    ctx,
+                    self.inner,
+                    hash.as_ref().as_ptr(),
+                )
+            })
+            .map(|ptr| (!ptr.is_null()).then(|| StorePath::new(ptr)))
+    }
+
     #[inline]
     fn new(ctx: CContext, store: *mut nixb_sys::Store) -> Self {
         Self { ctx, inner: store }
