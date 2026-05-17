@@ -54,6 +54,31 @@ impl Store {
             .map(|_err| ())
     }
 
+    /// Copies the the given [`StorePath`] from this store to the destination
+    /// store.
+    #[expect(clippy::too_many_arguments)]
+    #[inline]
+    pub fn copy_path(
+        &mut self,
+        dest: &mut Self,
+        path: &StorePath,
+        should_repair: bool,
+        should_check_sigs: bool,
+    ) -> Result<()> {
+        self.ctx
+            .with_ptr(|ctx| unsafe {
+                nixb_sys::store_copy_path(
+                    ctx,
+                    self.inner,
+                    dest.inner,
+                    path.as_ptr(),
+                    should_repair,
+                    should_check_sigs,
+                )
+            })
+            .map(|_err| ())
+    }
+
     /// Creates a [`NixDerivation`] from a JSON representation of that
     /// derivation.
     #[inline]
