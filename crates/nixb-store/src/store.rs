@@ -246,6 +246,57 @@ impl Store {
         Ok(state.ret.expect("callback was called"))
     }
 
+    /// Calls the given function with this store's version and returns its
+    /// output.
+    ///
+    /// If the store doesn't have a version (like the dummy store), calls the
+    /// given function with `None`.
+    #[inline]
+    pub fn get_version<T, F>(&mut self, fun: F) -> Result<T>
+    where
+        F: FnOnce(Option<&str>) -> T,
+    {
+        struct CallbackState<F, T> {
+            fun: Option<F>,
+            ret: Option<T>,
+        }
+
+        unsafe extern "C" fn callback<F, T>(
+            start: *const c_char,
+            n: c_uint,
+            user_data: *mut c_void,
+        ) where
+            F: FnOnce(Option<&str>) -> T,
+        {
+            let version = if n == 0 {
+                None
+            } else {
+                let bytes = unsafe {
+                    core::slice::from_raw_parts(start.cast::<u8>(), n as usize)
+                };
+                Some(unsafe { str::from_utf8_unchecked(bytes) })
+            };
+
+            let state =
+                unsafe { &mut *user_data.cast::<CallbackState<F, T>>() };
+            let fun = state.fun.take().expect("it's set");
+            state.ret = Some(fun(version));
+        }
+
+        let mut state = CallbackState { fun: Some(fun), ret: None };
+
+        self.ctx.with_ptr(|ctx| unsafe {
+            nixb_sys::store_get_version(
+                ctx,
+                self.inner,
+                Some(callback::<F, T>),
+                (&mut state as *mut CallbackState<F, T>).cast(),
+            )
+        })?;
+
+        Ok(state.ret.expect("callback was called"))
+    }
+
     /// TODO: docs.
     #[inline]
     pub fn open(
