@@ -34,6 +34,26 @@ impl Store {
             .map(StorePath::new)
     }
 
+    /// Copies the closure of the given [`StorePath`] from this store to the
+    /// destination store.
+    #[inline]
+    pub fn copy_closure(
+        &mut self,
+        dest: &mut Self,
+        path: &StorePath,
+    ) -> Result<()> {
+        self.ctx
+            .with_ptr(|ctx| unsafe {
+                nixb_sys::store_copy_closure(
+                    ctx,
+                    self.inner,
+                    dest.inner,
+                    path.as_ptr(),
+                )
+            })
+            .map(|_err| ())
+    }
+
     /// Creates a [`NixDerivation`] from a JSON representation of that
     /// derivation.
     #[inline]
