@@ -21,9 +21,22 @@ pub struct Store {
 }
 
 impl Store {
+    /// Adds the given derivation to this store.
+    #[inline]
+    pub fn add_derivation(
+        &mut self,
+        derivation: NixDerivation,
+    ) -> Result<StorePath> {
+        self.ctx
+            .with_ptr(|ctx| unsafe {
+                nixb_sys::add_derivation(ctx, self.inner, derivation.as_ptr())
+            })
+            .map(StorePath::new)
+    }
+
     /// TODO: docs.
     #[inline]
-    pub fn drv_from_store_path<F>(
+    pub fn drv_from_store_path(
         &mut self,
         store_path: &StorePath,
     ) -> Result<NixDerivation> {

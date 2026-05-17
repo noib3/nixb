@@ -5,6 +5,11 @@ pub struct NixDerivation {
 
 impl NixDerivation {
     #[inline]
+    pub(crate) fn as_ptr(&self) -> *mut nixb_sys::derivation {
+        self.inner
+    }
+
+    #[inline]
     pub(crate) fn new(ptr: *mut nixb_sys::derivation) -> Self {
         assert!(!ptr.is_null());
         Self { inner: ptr }
