@@ -162,7 +162,7 @@ impl Store {
     }
 
     /// Calls the given function with the `storeDir` of this store (typically
-    /// `"/nix/store"`).
+    /// `"/nix/store"`) and returns its output.
     #[inline]
     pub fn get_storedir<T, F>(&mut self, fun: F) -> Result<T>
     where
@@ -194,6 +194,48 @@ impl Store {
 
         self.ctx.with_ptr(|ctx| unsafe {
             nixb_sys::store_get_storedir(
+                ctx,
+                self.inner,
+                Some(callback::<F, T>),
+                (&mut state as *mut CallbackState<F, T>).cast(),
+            )
+        })?;
+
+        Ok(state.ret.expect("callback was called"))
+    }
+
+    /// Calls the given function with this store's URI and returns its output.
+    #[inline]
+    pub fn get_uri<T, F>(&mut self, fun: F) -> Result<T>
+    where
+        F: FnOnce(&str) -> T,
+    {
+        struct CallbackState<F, T> {
+            fun: Option<F>,
+            ret: Option<T>,
+        }
+
+        unsafe extern "C" fn callback<F, T>(
+            start: *const c_char,
+            n: c_uint,
+            user_data: *mut c_void,
+        ) where
+            F: FnOnce(&str) -> T,
+        {
+            let bytes = unsafe {
+                core::slice::from_raw_parts(start.cast::<u8>(), n as usize)
+            };
+            let uri = unsafe { str::from_utf8_unchecked(bytes) };
+            let state =
+                unsafe { &mut *user_data.cast::<CallbackState<F, T>>() };
+            let fun = state.fun.take().expect("it's set");
+            state.ret = Some(fun(uri));
+        }
+
+        let mut state = CallbackState { fun: Some(fun), ret: None };
+
+        self.ctx.with_ptr(|ctx| unsafe {
+            nixb_sys::store_get_uri(
                 ctx,
                 self.inner,
                 Some(callback::<F, T>),
