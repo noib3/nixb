@@ -40,7 +40,7 @@ impl Store {
     pub fn copy_closure(
         &mut self,
         dest: &mut Self,
-        path: &StorePath,
+        store_path: &StorePath,
     ) -> Result<()> {
         self.ctx
             .with_ptr(|ctx| unsafe {
@@ -48,7 +48,7 @@ impl Store {
                     ctx,
                     self.inner,
                     dest.inner,
-                    path.as_ptr(),
+                    store_path.as_ptr(),
                 )
             })
             .map(|_err| ())
@@ -61,7 +61,7 @@ impl Store {
     pub fn copy_path(
         &mut self,
         dest: &mut Self,
-        path: &StorePath,
+        store_path: &StorePath,
         should_repair: bool,
         should_check_sigs: bool,
     ) -> Result<()> {
@@ -71,7 +71,7 @@ impl Store {
                     ctx,
                     self.inner,
                     dest.inner,
-                    path.as_ptr(),
+                    store_path.as_ptr(),
                     should_repair,
                     should_check_sigs,
                 )
@@ -149,6 +149,15 @@ impl Store {
                 (&mut fun as *mut F).cast(),
                 Some(callback::<F>),
             );
+        })
+    }
+
+    /// Checks if the given [`StorePath`] is valid (i.e. whether a corresponding
+    /// store object and its closure of references exist in this store).
+    #[inline]
+    pub fn is_valid_path(&mut self, store_path: &StorePath) -> Result<bool> {
+        self.ctx.with_ptr(|ctx| unsafe {
+            nixb_sys::store_is_valid_path(ctx, self.inner, store_path.as_ptr())
         })
     }
 
