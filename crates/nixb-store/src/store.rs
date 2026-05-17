@@ -6,7 +6,13 @@ use core::{mem, ptr};
 use nixb_c_context::CContext;
 use nixb_error::Result;
 
-use crate::{GetFsClosureOpts, InitSentinel, StoreParam, StorePath};
+use crate::{
+    GetFsClosureOpts,
+    InitSentinel,
+    NixDerivation,
+    StoreParam,
+    StorePath,
+};
 
 /// TODO: docs.
 pub struct Store {
@@ -15,6 +21,23 @@ pub struct Store {
 }
 
 impl Store {
+    /// TODO: docs.
+    #[inline]
+    pub fn drv_from_store_path<F>(
+        &mut self,
+        store_path: &StorePath,
+    ) -> Result<NixDerivation> {
+        self.ctx
+            .with_ptr(|ctx| unsafe {
+                nixb_sys::store_drv_from_store_path(
+                    ctx,
+                    self.inner,
+                    store_path.as_ptr(),
+                )
+            })
+            .map(NixDerivation::new)
+    }
+
     /// TODO: docs.
     #[inline]
     pub fn get_fs_closure<F>(
