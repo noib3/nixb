@@ -346,6 +346,61 @@ impl Store {
             .map(|ptr| (!ptr.is_null()).then(|| StorePath::new(ptr)))
     }
 
+    /// Calls the given function with the physical location of the given
+    /// [`StorePath`] and returns its output.
+    ///
+    /// A store may reside at a different location than its `storeDir` suggests.
+    /// This situation is called a relocated store. Relocated stores are used
+    /// during NixOS installation, as well as in restricted computing
+    /// environments that don't offer a writable `"/nix/store"`.
+    ///
+    /// Not all types of stores support this operation.
+    #[inline]
+    pub fn real_path<T, F>(
+        &mut self,
+        store_path: &StorePath,
+        fun: F,
+    ) -> Result<T>
+    where
+        F: FnOnce(&str) -> T,
+    {
+        struct CallbackState<F, T> {
+            fun: Option<F>,
+            ret: Option<T>,
+        }
+
+        unsafe extern "C" fn callback<F, T>(
+            start: *const c_char,
+            n: c_uint,
+            user_data: *mut c_void,
+        ) where
+            F: FnOnce(&str) -> T,
+        {
+            let bytes = unsafe {
+                core::slice::from_raw_parts(start.cast::<u8>(), n as usize)
+            };
+            let real_path = unsafe { str::from_utf8_unchecked(bytes) };
+            let state =
+                unsafe { &mut *user_data.cast::<CallbackState<F, T>>() };
+            let fun = state.fun.take().expect("it's set");
+            state.ret = Some(fun(real_path));
+        }
+
+        let mut state = CallbackState { fun: Some(fun), ret: None };
+
+        self.ctx.with_ptr(|ctx| unsafe {
+            nixb_sys::store_real_path(
+                ctx,
+                self.inner,
+                store_path.as_ptr(),
+                Some(callback::<F, T>),
+                (&mut state as *mut CallbackState<F, T>).cast(),
+            )
+        })?;
+
+        Ok(state.ret.expect("callback was called"))
+    }
+
     #[inline]
     fn new(ctx: CContext, store: *mut nixb_sys::Store) -> Self {
         Self { ctx, inner: store }
