@@ -16,11 +16,11 @@ use core::{fmt, mem};
 use nixb_error::{Error, ErrorKind, Result};
 pub use nixb_macros::attrset;
 
-use crate::Utf8CStr;
+use crate::{IntoResult, Utf8CStr};
 use crate::callable::{Callable, NixLambda};
 use crate::context::{AttrsetBuilder, Context};
 use crate::error::TypeMismatchError;
-use crate::function::Function;
+use crate::function::function;
 use crate::tuple::Tuple;
 use crate::value::{
     Borrowed,
@@ -503,14 +503,17 @@ impl<Owner: ValueOwner> NixDerivation<Owner> {
 
     /// Returns the output path of this derivation.
     #[inline]
-    pub fn override_attrs<'a>(
+    pub fn override_attrs<'a, NewAttrs>(
         &self,
-        fun: impl Function<Args<'a> = NixAttrset<Borrowed<'a>>> + 'static,
+        fun: impl FnMut(NixAttrset<Borrowed<'a>>) -> NewAttrs + 'static,
         ctx: &mut Context,
-    ) -> Result<NixDerivation> {
+    ) -> Result<NixDerivation>
+    where
+        NewAttrs: IntoResult<Output: Attrset + Value, Error: Into<Error>> + 'a,
+    {
         self.inner
             .get::<NixLambda<_>>(c"overrideAttrs", ctx)?
-            .call(Function::into_value(fun), ctx)?
+            .call(function::<NixAttrset<Borrowed<'a>>>(fun), ctx)?
             .force_into(ctx)
     }
 
