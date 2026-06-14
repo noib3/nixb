@@ -14,10 +14,10 @@ pub trait Tuple {
     type Last;
 
     /// The type of the tuple without the first element.
-    type FromFirst: Tuple;
+    type FromFirst;
 
     /// The type of the tuple without the last element.
-    type UpToLast: Tuple;
+    type UpToLast;
 
     /// TODO: docs.
     type Borrow<'a>: Tuple
@@ -50,7 +50,7 @@ pub trait Tuple {
 }
 
 /// A non-empty tuple.
-pub trait RecursiveTuple: Tuple {}
+pub trait RecursiveTuple: Tuple<FromFirst: Tuple, UpToLast: Tuple> {}
 
 impl Tuple for () {
     const LEN: usize = 0;
