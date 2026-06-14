@@ -20,11 +20,10 @@ use crate::callable::{Callable, NixLambda};
 use crate::context::{AttrsetBuilder, Context};
 use crate::error::TypeMismatchError;
 use crate::function::function;
-use crate::tuple::Tuple;
+use crate::tuple::{RecursiveTuple, Tuple};
 use crate::value::{
     Borrowed,
     IntoValue,
-    IntoValues,
     NixValue,
     Owned,
     TryFromValue,
@@ -172,8 +171,19 @@ pub trait Key: fmt::Debug {
 
 /// TODO: docs.
 pub trait Keys:
-    Tuple<First: Key, Last: Key, FromFirst: IntoKeys, UpToLast: IntoKeys>
+    Tuple<
+        First: Key,
+        Last: Key,
+        FromFirst = <Self as Keys>::FromFirst,
+        UpToLast = <Self as Keys>::UpToLast,
+    >
 {
+    /// TODO: docs.
+    type FromFirst: Keys;
+
+    /// TODO: docs.
+    type UpToLast: Keys;
+
     /// Calls the given closure for each key in the tuple.
     ///
     /// The closure must return a boolean indicating whether to continue
@@ -189,14 +199,9 @@ pub trait Keys:
         }
         let (first, rest) = self.split_first();
         if first.with_cstr(&mut fun) {
-            rest.into_keys().for_each(fun);
+            rest.for_each(fun);
         }
     }
-}
-
-#[doc(hidden)]
-pub trait IntoKeys {
-    fn into_keys(self) -> impl Keys;
 }
 
 /// TODO: docs.
@@ -422,7 +427,7 @@ impl<Owner: ValueOwner> NixAttrset<Owner> {
                 match res {
                     Ok(Some(next_attrs)) => get_attrs(
                         next_attrs,
-                        rest.into_keys(),
+                        rest,
                         on_key_missing,
                         on_get_error,
                         ctx,
@@ -439,7 +444,7 @@ impl<Owner: ValueOwner> NixAttrset<Owner> {
 
         let (attrs, on_key_missing) = get_attrs(
             self.as_borrowed(),
-            up_to_last.into_keys(),
+            up_to_last,
             on_key_missing,
             on_get_error,
             ctx,
@@ -842,21 +847,6 @@ impl<const KEYS_ARE_ORDERED: bool, K: Keys, V: Values> Attrset
     }
 }
 
-impl<const KEYS_ARE_ORDERED: bool> Attrset
-    for StaticAttrset<KEYS_ARE_ORDERED, (), ()>
-{
-    #[inline]
-    fn into_attrset_iter(
-        self,
-        _: &mut Context,
-    ) -> impl AttrsetIterator + use<KEYS_ARE_ORDERED>
-    where
-        Self: Sized,
-    {
-        StaticAttrsetIterator { keys: (), values: () }
-    }
-}
-
 impl<const KEYS_ARE_ORDERED: bool, K: Keys, V: Values> MergeableAttrset
     for StaticAttrset<KEYS_ARE_ORDERED, K, V>
 where
@@ -893,20 +883,6 @@ where
 
 impl<const KEYS_ARE_ORDERED: bool, K: Keys, V: Values> Value
     for StaticAttrset<KEYS_ARE_ORDERED, K, V>
-{
-    #[inline]
-    fn kind(&self) -> ValueKind {
-        ValueKind::Attrset
-    }
-
-    #[inline]
-    fn write(self, dest: UninitValue, ctx: &mut Context) -> Result<()> {
-        Attrset::write(self, dest, ctx)
-    }
-}
-
-impl<const KEYS_ARE_ORDERED: bool> Value
-    for StaticAttrset<KEYS_ARE_ORDERED, (), ()>
 {
     #[inline]
     fn kind(&self) -> ValueKind {
@@ -1217,27 +1193,9 @@ impl<K: Keys, V: Values> AttrsetIterator for StaticAttrsetIterator<K, V> {
     ) -> T {
         let (first_key, rest_keys) = self.keys.split_first();
         let (first_value, rest_values) = self.values.split_first();
-        let rest = StaticAttrsetIterator {
-            keys: rest_keys.into_keys(),
-            values: rest_values.into_values(),
-        };
+        let rest =
+            StaticAttrsetIterator { keys: rest_keys, values: rest_values };
         fun.call(first_key, first_value.into_value(ctx.as_mut()), rest, ctx)
-    }
-}
-
-impl AttrsetIterator for StaticAttrsetIterator<(), ()> {
-    #[inline]
-    fn len(&self) -> c_uint {
-        0
-    }
-
-    #[cold]
-    fn with_next<'eval, Ctx: AsMut<Context<'eval>>, T>(
-        self,
-        _: impl FnOnceKeyValueIter<Ctx, T>,
-        _: Ctx,
-    ) -> T {
-        panic!("AttrsetItrator::with_next called on an exhausted iterator");
     }
 }
 
@@ -1527,44 +1485,24 @@ where
     }
 }
 
-impl<T> Keys for T where
-    T: Tuple<First: Key, Last: Key, FromFirst: IntoKeys, UpToLast: IntoKeys>
+impl Keys for () {
+    type FromFirst = Self;
+    type UpToLast = Self;
+}
+
+impl<T> Keys for [T; 0] {
+    type FromFirst = Self;
+    type UpToLast = Self;
+}
+
+impl<T> Keys for T
+where
+    T: RecursiveTuple<First: Key, Last: Key>,
+    <T as Tuple>::FromFirst: Keys,
+    <T as Tuple>::UpToLast: Keys,
 {
-}
-
-impl IntoKeys for () {
-    #[inline]
-    fn into_keys(self) -> impl Keys {
-        #[derive(Copy, Clone)]
-        struct EmptyKeys;
-
-        impl Tuple for EmptyKeys {
-            const LEN: usize = 0;
-            type First = &'static CStr;
-            type Last = &'static CStr;
-            type FromFirst = ();
-            type UpToLast = ();
-            type Borrow<'a> = Self;
-
-            fn borrow(&self) -> Self::Borrow<'_> {
-                *self
-            }
-            fn split_first(self) -> (Self::First, Self::FromFirst) {
-                panic!("cannot split first from empty keys")
-            }
-            fn split_last(self) -> (Self::UpToLast, Self::Last) {
-                panic!("cannot split last from empty keys")
-            }
-        }
-
-        EmptyKeys
-    }
-}
-
-impl<T: Keys> IntoKeys for T {
-    fn into_keys(self) -> impl Keys {
-        self
-    }
+    type FromFirst = <T as Tuple>::FromFirst;
+    type UpToLast = <T as Tuple>::UpToLast;
 }
 
 #[doc(hidden)]
@@ -1590,24 +1528,23 @@ pub mod skips {
     }
 
     pub trait SkippableValues:
-        Tuple<First: SkippableValue, FromFirst: IntoSkippableValues>
+        Tuple<
+            First: SkippableValue,
+            Last: SkippableValue,
+            FromFirst = <Self as SkippableValues>::FromFirst,
+        >
     {
+        type FromFirst: SkippableValues;
     }
 
     pub trait SkippableValuesRefs:
         Tuple<
             First: Deref<Target: SkippableValue>,
-            FromFirst: IntoSkippableValuesRefs,
+            Last: Deref<Target: SkippableValue>,
+            FromFirst = <Self as SkippableValuesRefs>::FromFirst,
         >
     {
-    }
-
-    pub trait IntoSkippableValues {
-        fn into_values(self) -> impl SkippableValues;
-    }
-
-    pub trait IntoSkippableValuesRefs {
-        fn into_values(self) -> impl SkippableValuesRefs;
+        type FromFirst: SkippableValuesRefs;
     }
 
     struct StaticAttrsetWithSkipsIterator<K, V> {
@@ -1658,8 +1595,8 @@ pub mod skips {
                 !should_skip
             } else {
                 StaticAttrsetWithSkips::<KEYS_ARE_ORDERED, _, _> {
-                    keys: rest_keys.into_keys(),
-                    values: rest_values.into_values(),
+                    keys: rest_keys,
+                    values: rest_values,
                     // The length only decreases if this key-value pair is not
                     // skipped.
                     len: self.len - (!should_skip as c_uint),
@@ -1685,8 +1622,8 @@ pub mod skips {
                 first_key.with_cstr(|key| fun(key, ctx));
             }
             StaticAttrsetWithSkips::<KEYS_ARE_ORDERED, _, _> {
-                keys: rest_keys.into_keys(),
-                values: rest_values.into_values(),
+                keys: rest_keys,
+                values: rest_values,
                 // The length only decreases if this key-value pair is not
                 // skipped.
                 len: self.len - (!should_skip as c_uint),
@@ -1777,8 +1714,8 @@ pub mod skips {
             let (first_value, rest_values) = self.values.split_first();
             if first_value.should_skip() {
                 StaticAttrsetWithSkipsIterator {
-                    keys: rest_keys.into_keys(),
-                    values: rest_values.into_values(),
+                    keys: rest_keys,
+                    values: rest_values,
                     // This key-value pair is skipped, so the length remains
                     // the same.
                     len: self.len,
@@ -1786,8 +1723,8 @@ pub mod skips {
                 .with_next(fun, ctx)
             } else {
                 let rest = StaticAttrsetWithSkipsIterator {
-                    keys: rest_keys.into_keys(),
-                    values: rest_values.into_values(),
+                    keys: rest_keys,
+                    values: rest_values,
                     // The key-value pair is not skipped, so the length
                     // decreases by 1.
                     len: self.len - 1,
@@ -1832,86 +1769,38 @@ pub mod skips {
         }
     }
 
-    impl<T> SkippableValues for T where
-        T: Tuple<First: SkippableValue, FromFirst: IntoSkippableValues>
+    impl SkippableValues for () {
+        type FromFirst = Self;
+    }
+
+    impl<T> SkippableValues for [T; 0] {
+        type FromFirst = Self;
+    }
+
+    impl<T> SkippableValues for T
+    where
+        T: RecursiveTuple<First: SkippableValue, Last: SkippableValue>,
+        <T as Tuple>::FromFirst: SkippableValues,
     {
+        type FromFirst = <T as Tuple>::FromFirst;
     }
 
-    impl<T: SkippableValues> IntoSkippableValues for T {
-        fn into_values(self) -> impl SkippableValues {
-            self
-        }
+    impl SkippableValuesRefs for () {
+        type FromFirst = Self;
     }
 
-    impl IntoSkippableValues for () {
-        #[inline]
-        fn into_values(self) -> impl SkippableValues {
-            #[derive(Copy, Clone)]
-            struct EmptySkippableValues;
-
-            impl Tuple for EmptySkippableValues {
-                const LEN: usize = 0;
-                type First = u8;
-                type Last = u8;
-                type FromFirst = ();
-                type UpToLast = ();
-                type Borrow<'a> = Self;
-
-                fn borrow(&self) -> Self::Borrow<'_> {
-                    *self
-                }
-                fn split_first(self) -> (Self::First, Self::FromFirst) {
-                    panic!("cannot split first from empty values")
-                }
-                fn split_last(self) -> (Self::UpToLast, Self::Last) {
-                    panic!("cannot split last from empty values")
-                }
-            }
-
-            EmptySkippableValues
-        }
+    impl<T> SkippableValuesRefs for [T; 0] {
+        type FromFirst = Self;
     }
 
-    impl<V> SkippableValuesRefs for V where
-        V: Tuple<
+    impl<T> SkippableValuesRefs for T
+    where
+        T: RecursiveTuple<
                 First: Deref<Target: SkippableValue>,
-                FromFirst: IntoSkippableValuesRefs,
-            >
+                Last: Deref<Target: SkippableValue>,
+            >,
+        <T as Tuple>::FromFirst: SkippableValuesRefs,
     {
-    }
-
-    impl<T: SkippableValuesRefs> IntoSkippableValuesRefs for T {
-        fn into_values(self) -> impl SkippableValuesRefs {
-            self
-        }
-    }
-
-    impl IntoSkippableValuesRefs for () {
-        #[inline]
-        fn into_values(self) -> impl SkippableValuesRefs {
-            #[derive(Copy, Clone)]
-            struct EmptySkippableValuesRefs;
-
-            impl Tuple for EmptySkippableValuesRefs {
-                const LEN: usize = 0;
-                type First = &'static u8;
-                type Last = u8;
-                type FromFirst = ();
-                type UpToLast = ();
-                type Borrow<'a> = Self;
-
-                fn borrow(&self) -> Self::Borrow<'_> {
-                    *self
-                }
-                fn split_first(self) -> (Self::First, Self::FromFirst) {
-                    panic!("cannot split first from empty values")
-                }
-                fn split_last(self) -> (Self::UpToLast, Self::Last) {
-                    panic!("cannot split last from empty values")
-                }
-            }
-
-            EmptySkippableValuesRefs
-        }
+        type FromFirst = <T as Tuple>::FromFirst;
     }
 }

@@ -13,7 +13,7 @@ use nixb_error::{Error, Result};
 use crate::context::Context;
 use crate::error::{TryFromI64Error, TryIntoI64Error, TypeMismatchError};
 use crate::list::{List, NixList};
-use crate::tuple::Tuple;
+use crate::tuple::{RecursiveTuple, Tuple};
 
 /// TODO: docs.
 pub trait Value {
@@ -92,16 +92,15 @@ pub trait Values:
     Tuple<
         First: IntoValue,
         Last: IntoValue,
-        FromFirst: IntoValues,
-        UpToLast: IntoValues,
+        FromFirst = <Self as Values>::FromFirst,
+        UpToLast = <Self as Values>::UpToLast,
     >
 {
-}
-
-/// TODO: docs.
-pub trait IntoValues {
     /// TODO: docs.
-    fn into_values(self) -> impl Values;
+    type FromFirst: Values;
+
+    /// TODO: docs.
+    type UpToLast: Values;
 }
 
 /// TODO: docs.
@@ -1105,47 +1104,22 @@ impl<Owner: ValueOwner> TryFromValue<NixValue<Owner>>
     }
 }
 
-impl<T> Values for T where
-    T: Tuple<
-            First: IntoValue,
-            Last: IntoValue,
-            FromFirst: IntoValues,
-            UpToLast: IntoValues,
-        >
+impl Values for () {
+    type FromFirst = Self;
+    type UpToLast = Self;
+}
+
+impl<T> Values for [T; 0] {
+    type FromFirst = Self;
+    type UpToLast = Self;
+}
+
+impl<T> Values for T
+where
+    T: RecursiveTuple<First: IntoValue, Last: IntoValue>,
+    <T as Tuple>::FromFirst: Values,
+    <T as Tuple>::UpToLast: Values,
 {
-}
-
-impl IntoValues for () {
-    #[inline]
-    fn into_values(self) -> impl Values {
-        #[derive(Copy, Clone)]
-        struct EmptyValues;
-
-        impl Tuple for EmptyValues {
-            const LEN: usize = 0;
-            type First = Null;
-            type Last = Null;
-            type FromFirst = ();
-            type UpToLast = ();
-            type Borrow<'a> = Self;
-
-            fn borrow(&self) -> Self::Borrow<'_> {
-                *self
-            }
-            fn split_first(self) -> (Self::First, Self::FromFirst) {
-                panic!("cannot split first from empty values")
-            }
-            fn split_last(self) -> (Self::UpToLast, Self::Last) {
-                panic!("cannot split last from empty values")
-            }
-        }
-
-        EmptyValues
-    }
-}
-
-impl<T: Values> IntoValues for T {
-    fn into_values(self) -> impl Values {
-        self
-    }
+    type FromFirst = <T as Tuple>::FromFirst;
+    type UpToLast = <T as Tuple>::UpToLast;
 }

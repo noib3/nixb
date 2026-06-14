@@ -10,7 +10,6 @@ use crate::error::TypeMismatchError;
 use crate::thunk::NixThunk;
 use crate::value::{
     IntoValue,
-    IntoValues,
     NixValue,
     Owned,
     TryFromValue,
@@ -113,18 +112,12 @@ pub trait Callable {
             first_arg.into_value(ctx).write(dest, ctx)?;
             *first_ptr = dest.as_ptr();
             *num_written += 1;
-            init_args_array(
-                rest_args.into_values(),
-                rest_slice,
-                num_written,
-                ctx,
-            )
+            init_args_array(rest_args, rest_slice, num_written, ctx)
         }
 
         // We'll do an eager call with the first N - 1 arguments, followed by
         // a lazy call with the last argument.
         let (args, last) = args.split_last();
-        let args = args.into_values();
 
         let mut args_array = new_args_array(&args);
         let mut num_written = 0;

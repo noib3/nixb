@@ -1,6 +1,6 @@
 //! TODO: docs.
 
-use crate::never::Never;
+use crate::Never;
 
 /// TODO: docs.
 pub trait Tuple {
@@ -49,12 +49,15 @@ pub trait Tuple {
     }
 }
 
+/// A non-empty tuple.
+pub trait RecursiveTuple: Tuple {}
+
 impl Tuple for () {
     const LEN: usize = 0;
     type First = Never;
     type Last = Never;
-    type FromFirst = Never;
-    type UpToLast = Never;
+    type FromFirst = Self;
+    type UpToLast = Self;
     type Borrow<'a> = Self;
 
     #[inline]
@@ -95,19 +98,23 @@ impl<T> Tuple for (T,) {
     }
 }
 
+impl<T> RecursiveTuple for (T,) {}
+
 impl<T> Tuple for [T; 0] {
     const LEN: usize = 0;
     type First = Never;
     type Last = Never;
-    type FromFirst = Never;
-    type UpToLast = Never;
+    type FromFirst = Self;
+    type UpToLast = Self;
     type Borrow<'a>
-        = ()
+        = [&'a T; 0]
     where
         T: 'a;
 
     #[inline]
-    fn borrow(&self) -> Self::Borrow<'_> {}
+    fn borrow(&self) -> Self::Borrow<'_> {
+        self.each_ref()
+    }
     #[inline]
     fn split_first(self) -> (Self::First, Self::FromFirst) {
         panic!("Cannot split first element from an empty array")
@@ -145,6 +152,8 @@ impl<T> Tuple for [T; 1] {
         ((), last)
     }
 }
+
+impl<T> RecursiveTuple for [T; 1] {}
 
 macro_rules! count {
     () => { 0 };
@@ -194,6 +203,11 @@ macro_rules! impl_tuple_for_tuple {
             fn split_last(self) -> (Self::UpToLast, Self::Last) {
                 ((self.$first_idx, $(self.$mid_idx,)*), self.$last_idx)
             }
+        }
+
+        impl<$first_T, $($mid_T,)* $last_T> RecursiveTuple
+            for ($first_T, $($mid_T,)* $last_T,)
+        {
         }
     };
 }
@@ -325,6 +339,8 @@ macro_rules! impl_tuple_for_array {
                 }
             }
         }
+
+        impl<T> RecursiveTuple for [T; $n] {}
     };
 }
 

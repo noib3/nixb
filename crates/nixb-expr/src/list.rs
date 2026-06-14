@@ -13,7 +13,6 @@ use crate::error::TypeMismatchError;
 use crate::value::{
     Borrowed,
     IntoValue,
-    IntoValues,
     NixValue,
     Owned,
     TryFromValue,
@@ -455,12 +454,8 @@ impl<V: Values> ListIterator for StaticList<V> {
         fun: impl FnOnceValueIter<Ctx, T>,
         mut ctx: Ctx,
     ) -> T {
-        let (first, rest) = V::split_first(self.values);
-        fun.call(
-            first.into_value(ctx.as_mut()),
-            StaticList::new(rest.into_values()),
-            ctx,
-        )
+        let (first, rest) = self.values.split_first();
+        fun.call(first.into_value(ctx.as_mut()), StaticList::new(rest), ctx)
     }
 }
 

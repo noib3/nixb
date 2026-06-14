@@ -21,5 +21,6 @@ mod utf8_cstr;
 pub mod value;
 
 pub use into_result::IntoResult;
+pub use never::Never;
 pub use nixb_macros::{Attrset, TryFromValue, Value};
 pub use utf8_cstr::Utf8CStr;
