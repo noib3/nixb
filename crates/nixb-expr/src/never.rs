@@ -1,5 +1,4 @@
 use core::ffi::CStr;
-use core::ops::Deref;
 
 use crate::attrset::Key;
 use crate::context::Context;
@@ -24,15 +23,6 @@ impl Value for Never {
 impl Key for Never {
     #[inline]
     fn with_cstr<F>(&self, _: impl FnOnce(&CStr) -> F) -> F {
-        match *self {}
-    }
-}
-
-impl Deref for Never {
-    type Target = Self;
-
-    #[inline]
-    fn deref(&self) -> &Self::Target {
         match *self {}
     }
 }

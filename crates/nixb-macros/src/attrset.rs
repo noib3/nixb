@@ -17,30 +17,30 @@ pub(crate) fn expand(input: TokenStream) -> syn::Result<TokenStream> {
 
     let mut keys = TokenStream::new();
     let mut values = TokenStream::new();
+    let mut is_present = TokenStream::new();
     let mut num_non_optional = 0;
 
     let comma = <Token![,]>::default();
 
     for (idx, pair) in pairs.iter().enumerate() {
-        // Add the pair's attributes to both keys and values.
+        // Add the pair's attributes to keys, values and is_present.
         for attr in &pair.attrs {
             attr.to_tokens(&mut keys);
             attr.to_tokens(&mut values);
+            attr.to_tokens(&mut is_present);
         }
 
         pair.key.to_tokens(&mut keys);
 
-        // Wrap optional values in MightSkip.
         if pair.is_optional {
             let value_var = format_ident!("__value_{idx}");
-            let skip_var = format_ident!("__should_skip_{idx}");
-            quote! {
-                ::nixb::expr::attrset::skips::MightSkip::new(#value_var, #skip_var)
-            }
-            .to_tokens(&mut values);
+            let is_present_var = format_ident!("__is_present_{idx}");
+            value_var.to_tokens(&mut values);
+            is_present_var.to_tokens(&mut is_present);
         } else {
             num_non_optional += 1;
             pair.value.to_tokens(&mut values);
+            quote! { true }.to_tokens(&mut is_present);
         }
 
         // Add a comma if this is not the last pair or if there's only one
@@ -48,6 +48,7 @@ pub(crate) fn expand(input: TokenStream) -> syn::Result<TokenStream> {
         if idx + 1 < pairs.len() || pairs.len() == 1 {
             comma.to_tokens(&mut keys);
             comma.to_tokens(&mut values);
+            comma.to_tokens(&mut is_present);
         }
     }
 
@@ -57,22 +58,28 @@ pub(crate) fn expand(input: TokenStream) -> syn::Result<TokenStream> {
         let optional_var_declarations = pairs.iter().enumerate().filter_map(|(idx, pair)| {
             if pair.is_optional {
                 let value_var = format_ident!("__value_{idx}");
-                let skip_var = format_ident!("__should_skip_{idx}");
+                let is_present_var = format_ident!("__is_present_{idx}");
                 let value = &pair.value;
+                let attrs = &pair.attrs;
                 Some(quote! {
-                    let #value_var = #value;
-                    let #skip_var = ::core::option::Option::is_none(&#value_var);
+                    #(#attrs)* let #value_var = #value;
+                    #(#attrs)* let #is_present_var = ::core::option::Option::is_some(&#value_var);
                 })
             } else {
                 None
             }
         });
 
-        let plus_one_if_not_skipped =
+        let len_increments =
             pairs.iter().enumerate().filter_map(|(idx, pair)| {
                 if pair.is_optional {
-                    let skip_var = format_ident!("__should_skip_{idx}");
-                    Some(quote! { + (!#skip_var as ::core::ffi::c_uint) })
+                    let is_present_var = format_ident!("__is_present_{idx}");
+                    let attrs = &pair.attrs;
+                    Some(quote! {
+                        #(#attrs)* if #is_present_var {
+                            __len += 1;
+                        }
+                    })
                 } else {
                     None
                 }
@@ -80,10 +87,13 @@ pub(crate) fn expand(input: TokenStream) -> syn::Result<TokenStream> {
 
         Ok(quote! {{
             #(#optional_var_declarations)*
-            ::nixb::expr::attrset::StaticAttrsetWithSkips::<#all_keys_are_literals, _, _>::new(
+            let mut __len: ::core::ffi::c_uint = #num_non_optional;
+            #(#len_increments)*
+            ::nixb::expr::attrset::StaticAttrsetWithOptionalFields::<#all_keys_are_literals, _, _, _>::new(
                 (#keys),
                 (#values),
-                #num_non_optional #(#plus_one_if_not_skipped)*,
+                [#is_present],
+                __len,
             )
         }})
     } else {

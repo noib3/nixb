@@ -78,13 +78,17 @@ pub(crate) fn expand(input: DeriveInput) -> syn::Result<TokenStream> {
         .iter()
         .map(|field| Literal::c_string(&field.field_key_as_c_string));
     let values = fields.iter().map(|field| &field.value_expr);
+    let is_present = fields.iter().map(|field| match &field.should_skip_expr {
+        Some(_) => {
+            let skip_var = &field.skip_var_name;
+            quote! { !#skip_var }
+        },
+        None => quote! { true },
+    });
 
     let num_non_skippable_fields =
         fields.iter().filter(|f| f.should_skip_expr.is_none()).count();
 
-    // We convert the struct into either a StaticAttrset or
-    // StaticAttrsetWithSkips depending on whether at least of its fields is
-    // skippable.
     let into_static_attrset_body = if num_non_skippable_fields == fields.len() {
         quote! {
             ::nixb::expr::attrset::StaticAttrset::<true, _, _>::new(
@@ -103,20 +107,26 @@ pub(crate) fn expand(input: DeriveInput) -> syn::Result<TokenStream> {
         let num_non_skippable =
             Literal::usize_unsuffixed(num_non_skippable_fields);
 
-        let plus_one_if_field_is_not_skipped =
-            fields.iter().filter_map(|field| {
-                field.should_skip_expr.as_ref().map(|_| {
-                    let skip_var = &field.skip_var_name;
-                    quote! { + (!#skip_var as ::core::ffi::c_uint) }
-                })
-            });
+        let len_increments = fields.iter().filter_map(|field| {
+            field.should_skip_expr.as_ref().map(|_| {
+                let skip_var = &field.skip_var_name;
+                quote! {
+                    if !#skip_var {
+                        __len += 1;
+                    }
+                }
+            })
+        });
 
         quote! {
             #(#skip_var_declarations)*
-            ::nixb::expr::attrset::StaticAttrsetWithSkips::<true, _, _>::new(
+            let mut __len: ::core::ffi::c_uint = #num_non_skippable;
+            #(#len_increments)*
+            ::nixb::expr::attrset::StaticAttrsetWithOptionalFields::<true, _, _, _>::new(
                 (#(#keys),*),
                 (#(#values),*),
-                #num_non_skippable #(#plus_one_if_field_is_not_skipped)*,
+                [#(#is_present),*],
+                __len,
             )
         }
     };
@@ -373,12 +383,6 @@ impl Field {
                 ::nixb::expr::value::IntoValueFn::new(move |__ctx| __call(#expr, __field))
             }},
             None => quote! { self.#field_ident },
-        };
-
-        let value_expr = if should_skip_expr.is_some() {
-            quote! { ::nixb::expr::attrset::skips::MightSkip::new(#value_expr, #skip_var_name) }
-        } else {
-            value_expr
         };
 
         Ok(Self {

@@ -238,9 +238,15 @@ pub struct StaticAttrset<const KEYS_ARE_ORDERED: bool, Keys, Values> {
 
 /// TODO: docs.
 #[derive(Clone)]
-pub struct StaticAttrsetWithSkips<const KEYS_ARE_ORDERED: bool, Keys, Values> {
+pub struct StaticAttrsetWithOptionalFields<
+    const KEYS_ARE_ORDERED: bool,
+    Keys,
+    Values,
+    const N: usize,
+> {
     keys: Keys,
     values: Values,
+    is_present: [bool; N],
     len: c_uint,
 }
 
@@ -603,6 +609,16 @@ impl<const KEYS_ARE_ORDERED: bool, K, V> StaticAttrset<KEYS_ARE_ORDERED, K, V> {
     #[inline]
     pub fn new(keys: K, values: V) -> Self {
         Self { keys, values }
+    }
+}
+
+impl<const KEYS_ARE_ORDERED: bool, K, V, const N: usize>
+    StaticAttrsetWithOptionalFields<KEYS_ARE_ORDERED, K, V, N>
+{
+    #[doc(hidden)]
+    #[inline]
+    pub fn new(keys: K, values: V, is_present: [bool; N], len: c_uint) -> Self {
+        Self { keys, values, is_present, len }
     }
 }
 
@@ -1506,162 +1522,116 @@ where
 }
 
 #[doc(hidden)]
-pub mod skips {
+pub mod optional_fields {
     //! TODO: docs.
 
     use super::*;
 
-    #[derive(Clone)]
-    pub struct MightSkip<V> {
-        should_skip: bool,
-        value: V,
-    }
-
-    pub trait SkippableValue {
-        fn should_skip(&self) -> bool;
-
-        /// Same as [`IntoValue::into_value`].
-        fn into_value<'eval>(
-            self,
-            ctx: &mut Context<'eval>,
-        ) -> impl Value + use<'eval, Self>;
-    }
-
-    pub trait SkippableValues:
-        Tuple<
-            First: SkippableValue,
-            Last: SkippableValue,
-            FromFirst = <Self as SkippableValues>::FromFirst,
-        >
-    {
-        type FromFirst: SkippableValues;
-    }
-
-    pub trait SkippableValuesRefs:
-        Tuple<
-            First: Deref<Target: SkippableValue>,
-            Last: Deref<Target: SkippableValue>,
-            FromFirst = <Self as SkippableValuesRefs>::FromFirst,
-        >
-    {
-        type FromFirst: SkippableValuesRefs;
-    }
-
-    struct StaticAttrsetWithSkipsIterator<K, V> {
+    struct StaticAttrsetWithOptionalFieldsIterator<K, V, const N: usize> {
         keys: K,
         values: V,
+        is_present: [bool; N],
+        index: usize,
         len: c_uint,
     }
 
-    impl<V> MightSkip<V> {
-        #[inline]
-        pub fn new(value: V, should_skip: bool) -> Self {
-            Self { should_skip, value }
-        }
+    struct StaticAttrsetWithOptionalFieldsKeys<K, const N: usize> {
+        keys: K,
+        is_present: [bool; N],
+        index: usize,
+        len: c_uint,
     }
 
-    impl<const KEYS_ARE_ORDERED: bool, K, V>
-        StaticAttrsetWithSkips<KEYS_ARE_ORDERED, K, V>
-    {
-        #[doc(hidden)]
-        #[inline]
-        pub fn new(keys: K, values: V, len: c_uint) -> Self {
-            Self { keys, values, len }
-        }
-
-        #[inline]
-        fn is_empty(&self) -> bool {
-            self.len == 0
-        }
-    }
-
-    impl<const KEYS_ARE_ORDERED: bool, K, V>
-        StaticAttrsetWithSkips<KEYS_ARE_ORDERED, K, V>
+    impl<K, const N: usize> StaticAttrsetWithOptionalFieldsKeys<K, N>
     where
         K: Keys,
-        V: SkippableValuesRefs,
     {
-        #[expect(clippy::same_name_method)]
         #[inline]
         fn contains_key(self, key: &CStr) -> bool {
-            if self.is_empty() {
+            if self.len == 0 {
                 return false;
             }
+
             let (first_key, rest_keys) = self.keys.split_first();
-            let (first_value, rest_values) = self.values.split_first();
-            let should_skip = first_value.deref().should_skip();
+            let is_present = self.is_present[self.index];
 
             if first_key.with_cstr(|k| k == key) {
-                !should_skip
+                is_present
             } else {
-                StaticAttrsetWithSkips::<KEYS_ARE_ORDERED, _, _> {
+                StaticAttrsetWithOptionalFieldsKeys {
                     keys: rest_keys,
-                    values: rest_values,
-                    // The length only decreases if this key-value pair is not
-                    // skipped.
-                    len: self.len - (!should_skip as c_uint),
+                    is_present: self.is_present,
+                    index: self.index + 1,
+                    len: self.len - (is_present as c_uint),
                 }
                 .contains_key(key)
             }
         }
 
-        #[expect(clippy::same_name_method)]
         #[inline]
         fn for_each_key<'eval>(
             self,
             mut fun: impl FnMut(&CStr, &mut Context<'eval>),
             ctx: &mut Context<'eval>,
         ) {
-            if self.is_empty() {
+            if self.len == 0 {
                 return;
             }
+
             let (first_key, rest_keys) = self.keys.split_first();
-            let (first_value, rest_values) = self.values.split_first();
-            let should_skip = first_value.deref().should_skip();
-            if !should_skip {
+            let is_present = self.is_present[self.index];
+
+            if is_present {
                 first_key.with_cstr(|key| fun(key, ctx));
             }
-            StaticAttrsetWithSkips::<KEYS_ARE_ORDERED, _, _> {
+
+            StaticAttrsetWithOptionalFieldsKeys {
                 keys: rest_keys,
-                values: rest_values,
-                // The length only decreases if this key-value pair is not
-                // skipped.
-                len: self.len - (!should_skip as c_uint),
+                is_present: self.is_present,
+                index: self.index + 1,
+                len: self.len - (is_present as c_uint),
             }
             .for_each_key(fun, ctx);
         }
     }
 
-    impl<const KEYS_ARE_ORDERED: bool, K: Keys, V: SkippableValues> Attrset
-        for StaticAttrsetWithSkips<KEYS_ARE_ORDERED, K, V>
+    impl<const KEYS_ARE_ORDERED: bool, K, V, const N: usize> Attrset
+        for StaticAttrsetWithOptionalFields<KEYS_ARE_ORDERED, K, V, N>
+    where
+        K: Keys,
+        V: Values,
     {
         #[inline]
         fn into_attrset_iter(
             self,
             _: &mut Context,
-        ) -> impl AttrsetIterator + use<KEYS_ARE_ORDERED, K, V>
+        ) -> impl AttrsetIterator + use<KEYS_ARE_ORDERED, K, V, N>
         where
             Self: Sized,
         {
-            StaticAttrsetWithSkipsIterator {
+            StaticAttrsetWithOptionalFieldsIterator {
                 keys: self.keys,
                 values: self.values,
+                is_present: self.is_present,
+                index: 0,
                 len: self.len,
             }
         }
     }
 
-    impl<const KEYS_ARE_ORDERED: bool, K: Keys, V: SkippableValues>
-        MergeableAttrset for StaticAttrsetWithSkips<KEYS_ARE_ORDERED, K, V>
+    impl<const KEYS_ARE_ORDERED: bool, K, V, const N: usize> MergeableAttrset
+        for StaticAttrsetWithOptionalFields<KEYS_ARE_ORDERED, K, V, N>
     where
+        K: Keys,
+        V: Values,
         for<'a> K::Borrow<'a>: Keys,
-        for<'a> V::Borrow<'a>: SkippableValuesRefs,
     {
         #[inline]
         fn contains_key(&self, key: &CStr, _: &mut Context) -> bool {
-            StaticAttrsetWithSkips::<KEYS_ARE_ORDERED, _, _> {
+            StaticAttrsetWithOptionalFieldsKeys {
                 keys: self.keys.borrow(),
-                values: self.values.borrow(),
+                is_present: self.is_present,
+                index: 0,
                 len: self.len,
             }
             .contains_key(key)
@@ -1673,17 +1643,20 @@ pub mod skips {
             fun: impl FnMut(&CStr, &mut Context<'eval>),
             ctx: &mut Context<'eval>,
         ) {
-            StaticAttrsetWithSkips::<KEYS_ARE_ORDERED, _, _> {
+            StaticAttrsetWithOptionalFieldsKeys {
                 keys: self.keys.borrow(),
-                values: self.values.borrow(),
+                is_present: self.is_present,
+                index: 0,
                 len: self.len,
             }
             .for_each_key(fun, ctx)
         }
     }
 
-    impl<const KEYS_ARE_ORDERED: bool, K: Keys, V: SkippableValues> Value
-        for StaticAttrsetWithSkips<KEYS_ARE_ORDERED, K, V>
+    impl<const KEYS_ARE_ORDERED: bool, K, V, const N: usize> Value
+        for StaticAttrsetWithOptionalFields<KEYS_ARE_ORDERED, K, V, N>
+    where
+        Self: Attrset,
     {
         #[inline]
         fn kind(&self) -> ValueKind {
@@ -1696,8 +1669,11 @@ pub mod skips {
         }
     }
 
-    impl<K: Keys, V: SkippableValues> AttrsetIterator
-        for StaticAttrsetWithSkipsIterator<K, V>
+    impl<K, V, const N: usize> AttrsetIterator
+        for StaticAttrsetWithOptionalFieldsIterator<K, V, N>
+    where
+        K: Keys,
+        V: Values,
     {
         #[inline]
         fn len(&self) -> c_uint {
@@ -1712,21 +1688,14 @@ pub mod skips {
         ) -> T {
             let (first_key, rest_keys) = self.keys.split_first();
             let (first_value, rest_values) = self.values.split_first();
-            if first_value.should_skip() {
-                StaticAttrsetWithSkipsIterator {
+            let is_present = self.is_present[self.index];
+
+            if is_present {
+                let rest = StaticAttrsetWithOptionalFieldsIterator {
                     keys: rest_keys,
                     values: rest_values,
-                    // This key-value pair is skipped, so the length remains
-                    // the same.
-                    len: self.len,
-                }
-                .with_next(fun, ctx)
-            } else {
-                let rest = StaticAttrsetWithSkipsIterator {
-                    keys: rest_keys,
-                    values: rest_values,
-                    // The key-value pair is not skipped, so the length
-                    // decreases by 1.
+                    is_present: self.is_present,
+                    index: self.index + 1,
                     len: self.len - 1,
                 };
                 fun.call(
@@ -1735,72 +1704,16 @@ pub mod skips {
                     rest,
                     ctx,
                 )
+            } else {
+                StaticAttrsetWithOptionalFieldsIterator {
+                    keys: rest_keys,
+                    values: rest_values,
+                    is_present: self.is_present,
+                    index: self.index + 1,
+                    len: self.len,
+                }
+                .with_next(fun, ctx)
             }
         }
-    }
-
-    impl<V: IntoValue> SkippableValue for V {
-        #[inline]
-        fn should_skip(&self) -> bool {
-            false
-        }
-
-        #[inline]
-        fn into_value<'eval>(
-            self,
-            ctx: &mut Context<'eval>,
-        ) -> impl Value + use<'eval, V> {
-            IntoValue::into_value(self, ctx)
-        }
-    }
-
-    impl<V: IntoValue> SkippableValue for MightSkip<V> {
-        #[inline]
-        fn should_skip(&self) -> bool {
-            self.should_skip
-        }
-
-        #[inline]
-        fn into_value<'eval>(
-            self,
-            ctx: &mut Context<'eval>,
-        ) -> impl Value + use<'eval, V> {
-            self.value.into_value(ctx)
-        }
-    }
-
-    impl SkippableValues for () {
-        type FromFirst = Self;
-    }
-
-    impl<T> SkippableValues for [T; 0] {
-        type FromFirst = Self;
-    }
-
-    impl<T> SkippableValues for T
-    where
-        T: RecursiveTuple<First: SkippableValue, Last: SkippableValue>,
-        <T as Tuple>::FromFirst: SkippableValues,
-    {
-        type FromFirst = <T as Tuple>::FromFirst;
-    }
-
-    impl SkippableValuesRefs for () {
-        type FromFirst = Self;
-    }
-
-    impl<T> SkippableValuesRefs for [T; 0] {
-        type FromFirst = Self;
-    }
-
-    impl<T> SkippableValuesRefs for T
-    where
-        T: RecursiveTuple<
-                First: Deref<Target: SkippableValue>,
-                Last: Deref<Target: SkippableValue>,
-            >,
-        <T as Tuple>::FromFirst: SkippableValuesRefs,
-    {
-        type FromFirst = <T as Tuple>::FromFirst;
     }
 }
