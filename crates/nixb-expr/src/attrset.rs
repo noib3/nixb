@@ -16,7 +16,6 @@ use core::{fmt, mem};
 use nixb_error::{Error, ErrorKind, Result};
 pub use nixb_macros::attrset;
 
-use crate::{IntoResult, Utf8CStr};
 use crate::callable::{Callable, NixLambda};
 use crate::context::{AttrsetBuilder, Context};
 use crate::error::TypeMismatchError;
@@ -35,6 +34,7 @@ use crate::value::{
     ValueOwner,
     Values,
 };
+use crate::{IntoResult, Utf8CStr};
 
 /// TODO: docs.
 pub trait Attrset {
@@ -588,10 +588,32 @@ impl<Owner: ValueOwner> NixAttrsetIterator<Owner> {
 }
 
 impl<const KEYS_ARE_ORDERED: bool, K, V> StaticAttrset<KEYS_ARE_ORDERED, K, V> {
+    /// TODO: docs.
+    #[inline]
+    pub fn into_parts(self) -> (K, V) {
+        (self.keys, self.values)
+    }
+
     #[doc(hidden)]
     #[inline]
     pub fn new(keys: K, values: V) -> Self {
         Self { keys, values }
+    }
+}
+
+impl<L, R> ConcatAttrset<L, R> {
+    /// TODO: docs.
+    #[inline]
+    pub fn into_parts(self) -> (L, R) {
+        (self.left, self.right)
+    }
+}
+
+impl<L, R> Merge<L, R> {
+    /// TODO: docs.
+    #[inline]
+    pub fn into_parts(self) -> (L, R) {
+        (self.left, self.right)
     }
 }
 

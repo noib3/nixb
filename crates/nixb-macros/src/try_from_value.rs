@@ -328,7 +328,7 @@ fn to_camel_case(field_name: &mut String) {
 
     let mut offset = 0;
 
-    let mut replace_buffer = [b' ', b' '];
+    let mut replace_buffer = *b"  ";
 
     while offset < field_name.len() {
         let Some((component, rest)) = field_name[offset..].split_once('_')
