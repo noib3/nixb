@@ -16,6 +16,7 @@ use crate::value::{
     Owned,
     TryFromValue,
     UninitValue,
+    Value,
     ValueOwner,
 };
 
@@ -167,6 +168,26 @@ impl<'eval> Context<'eval> {
 }
 
 impl<'eval> Context<'eval> {
+    /// TODO: docs.
+    #[inline]
+    pub fn new_value(&mut self, value: impl Value) -> Result<NixValue> {
+        let dest = self.alloc_value()?;
+
+        if let Err(err) = value.write(dest, self) {
+            let _ = self.with_raw(|ctx| unsafe {
+                nixb_sys::value_decref(ctx, dest.as_ptr())
+            });
+
+            return Err(err);
+        }
+
+        // SAFETY: `dest` points to an initialized Nix value, and this creates
+        // the unique `Owned` handle responsible for releasing that value.
+        let owner = unsafe { Owned::new(dest.as_non_null()) };
+
+        Ok(NixValue::new(owner))
+    }
+
     #[inline]
     pub(crate) fn into_inner(self) -> CContext {
         self.inner
