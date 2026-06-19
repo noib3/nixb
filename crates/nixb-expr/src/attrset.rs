@@ -54,7 +54,7 @@ pub trait Attrset {
     where
         Self: Sized,
     {
-        ConcatAttrset { left: self, right: other }
+        ConcatAttrset::new(self, other)
     }
 
     /// TODO: docs.
@@ -159,7 +159,7 @@ pub trait MergeableAttrset: Attrset {
     where
         Self: Sized,
     {
-        Merge { left: self, right: other, conflicts: OnceCell::new() }
+        Merge::new(self, other)
     }
 }
 
@@ -231,39 +231,53 @@ pub struct NixDerivation<Owner = Owned> {
 
 /// The attribute set type produced by the [`attrset!`] macro.
 #[derive(Clone)]
+#[non_exhaustive]
 pub struct StaticAttrset<const KEYS_ARE_ORDERED: bool, Keys, Values> {
-    keys: Keys,
-    values: Values,
+    /// TODO: docs.
+    pub keys: Keys,
+    /// TODO: docs.
+    pub values: Values,
 }
 
 /// TODO: docs.
 #[derive(Clone)]
+#[non_exhaustive]
 pub struct StaticAttrsetWithOptionalFields<
     const KEYS_ARE_ORDERED: bool,
     Keys,
     Values,
     const N: usize,
 > {
-    keys: Keys,
-    values: Values,
-    is_present: [bool; N],
-    len: c_uint,
+    /// TODO: docs.
+    pub keys: Keys,
+    /// TODO: docs.
+    pub values: Values,
+    /// TODO: docs.
+    pub is_present: [bool; N],
+    /// TODO: docs.
+    pub len: c_uint,
 }
 
 /// The attribute set type created by [`concat`](Attrset::concat)enating two
 /// attribute sets.
 #[derive(Clone)]
+#[non_exhaustive]
 pub struct ConcatAttrset<Left, Right> {
-    left: Left,
-    right: Right,
+    /// TODO: docs.
+    pub left: Left,
+    /// TODO: docs.
+    pub right: Right,
 }
 
 /// The attribute set type created by [`merge`](MergeableAttrset::merge)ing two
 /// attribute sets.
 #[derive(Clone)]
+#[non_exhaustive]
 pub struct Merge<Left, Right> {
-    left: Left,
-    right: Right,
+    /// TODO: docs.
+    pub left: Left,
+    /// TODO: docs.
+    pub right: Right,
     conflicts: OnceCell<Vec<CString>>,
 }
 
@@ -599,12 +613,6 @@ impl<Owner: ValueOwner> NixAttrsetIterator<Owner> {
 }
 
 impl<const KEYS_ARE_ORDERED: bool, K, V> StaticAttrset<KEYS_ARE_ORDERED, K, V> {
-    /// TODO: docs.
-    #[inline]
-    pub fn into_parts(self) -> (K, V) {
-        (self.keys, self.values)
-    }
-
     #[doc(hidden)]
     #[inline]
     pub fn new(keys: K, values: V) -> Self {
@@ -625,16 +633,16 @@ impl<const KEYS_ARE_ORDERED: bool, K, V, const N: usize>
 impl<L, R> ConcatAttrset<L, R> {
     /// TODO: docs.
     #[inline]
-    pub fn into_parts(self) -> (L, R) {
-        (self.left, self.right)
+    pub fn new(left: L, right: R) -> Self {
+        Self { left, right }
     }
 }
 
 impl<L, R> Merge<L, R> {
     /// TODO: docs.
     #[inline]
-    pub fn into_parts(self) -> (L, R) {
-        (self.left, self.right)
+    pub fn new(left: L, right: R) -> Self {
+        Self { left, right, conflicts: OnceCell::new() }
     }
 }
 
