@@ -275,9 +275,15 @@ impl Parse for Attrset {
                 }
             }
 
-            // Parse optional comma.
+            // Parse optional comma. A missing comma is only valid after the
+            // final pair.
             if input.peek(Token![,]) {
                 input.parse::<Token![,]>()?;
+            } else if !input.is_empty() {
+                return Err(syn::Error::new(
+                    input.span(),
+                    "expected `,` between attribute set fields",
+                ));
             }
         }
 
@@ -378,6 +384,32 @@ mod tests {
         assert_eq!(
             compile_error.matches("duplicate attrset key `value1`").count(),
             1
+        );
+    }
+
+    #[test]
+    fn rejects_missing_comma_between_fields() {
+        let error = expand(quote! {
+            value1: "Hello"
+            value2: "World",
+        })
+        .unwrap_err();
+
+        assert!(
+            error
+                .to_string()
+                .contains("expected `,` between attribute set fields")
+        );
+    }
+
+    #[test]
+    fn allows_missing_trailing_comma_after_final_field() {
+        assert!(
+            expand(quote! {
+                value1: "Hello",
+                value2: "World"
+            })
+            .is_ok()
         );
     }
 }
