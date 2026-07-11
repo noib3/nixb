@@ -259,9 +259,9 @@ impl<Owner: ValueOwner> NixValue<Owner> {
                     num_bytes_including_nul as usize,
                 )
             };
-            let cstr = unsafe { CStr::from_bytes_with_nul_unchecked(bytes) };
+            let c_str = unsafe { CStr::from_bytes_with_nul_unchecked(bytes) };
             let fun = unsafe { &mut **(fun_ref as *mut &mut dyn FnMut(&CStr)) };
-            fun(cstr);
+            fun(c_str);
         }
 
         let mut fun_ref = &mut fun as &mut dyn FnMut(&CStr);
@@ -414,9 +414,9 @@ impl<Owner: ValueOwner> StringValue for NixValue<Owner> {
 
     #[inline]
     unsafe fn into_string(self, ctx: &mut Context) -> Result<Self::String> {
-        let mut cstring = CString::default();
-        unsafe { self.with_string(|cstr| cstring = cstr.to_owned(), ctx)? };
-        Ok(cstring)
+        let mut c_string = CString::default();
+        unsafe { self.with_string(|c_str| c_string = c_str.to_owned(), ctx)? };
+        Ok(c_string)
     }
 }
 
@@ -425,7 +425,7 @@ impl<'a> PathValue for NixValue<Borrowed<'a>> {
 
     #[inline]
     unsafe fn into_path_string(self, _: &mut Context) -> Result<Self::Path> {
-        let cstr_ptr = unsafe {
+        let c_str_ptr = unsafe {
             nixb_sys::get_path_string(ptr::null_mut(), self.as_ptr())
         };
 
@@ -433,7 +433,7 @@ impl<'a> PathValue for NixValue<Borrowed<'a>> {
         // valid for as long as the value is alive.
         //
         // [docs]: https://hydra.nixos.org/build/313564006/download/1/html/group__value__extract.html#ga3420055c22accfd07cc5537210d748a9
-        Ok(unsafe { CStr::from_ptr(cstr_ptr) })
+        Ok(unsafe { CStr::from_ptr(c_str_ptr) })
     }
 }
 
@@ -693,7 +693,19 @@ impl Value for &str {
 
     #[inline(always)]
     fn write(self, dest: UninitValue, ctx: &mut Context) -> Result<()> {
-        CString::new(self)?.write(dest, ctx)
+        match CString::new(self) {
+            Ok(c_str) => c_str.write(dest, ctx),
+            Err(nul_err) => {
+                let until_nul_byte = &self[..nul_err.nul_position() + 1];
+                // SAFETY: the string we just sliced has a trailign NUL byte.
+                let c_str = unsafe {
+                    CStr::from_bytes_with_nul_unchecked(
+                        until_nul_byte.as_bytes(),
+                    )
+                };
+                c_str.write(dest, ctx)
+            },
+        }
     }
 }
 
@@ -783,7 +795,15 @@ impl Value for &std::path::Path {
     #[inline(always)]
     fn write(self, dest: UninitValue, ctx: &mut Context) -> Result<()> {
         let bytes = self.as_os_str().as_encoded_bytes();
-        let cstring = CString::new(bytes)?;
+
+        let c_string =
+            CString::new(bytes).map(Cow::Owned).unwrap_or_else(|nul_err| {
+                let until_nul_byte = &bytes[..nul_err.nul_position() + 1];
+                // SAFETY: the array we just sliced has a trailign NUL byte.
+                Cow::Borrowed(unsafe {
+                    CStr::from_bytes_with_nul_unchecked(until_nul_byte)
+                })
+            });
 
         // `nix_init_path_string` errors when:
         //
@@ -800,7 +820,7 @@ impl Value for &std::path::Path {
                 ctx,
                 state.as_ptr(),
                 dest.as_ptr(),
-                cstring.as_ptr(),
+                c_string.as_ptr(),
             );
 
             #[cfg(feature = "nix-2-34")]
@@ -808,7 +828,7 @@ impl Value for &std::path::Path {
                 ctx,
                 state.as_ptr(),
                 dest.as_ptr(),
-                cstring.as_ptr(),
+                c_string.as_ptr(),
             );
         })
         .unwrap_or_else(|err| {
@@ -1056,8 +1076,8 @@ impl<'a, V: PathValue<Path = &'a CStr>> TryFromValue<V>
         match value.kind() {
             ValueKind::Path => {
                 // SAFETY: the value's kind is a path.
-                let cstr = unsafe { value.into_path_string(ctx)? };
-                let os_str = OsStr::from_bytes(cstr.to_bytes());
+                let c_str = unsafe { value.into_path_string(ctx)? };
+                let os_str = OsStr::from_bytes(c_str.to_bytes());
                 Ok(Path::new(os_str))
             },
             other => Err(TypeMismatchError {
@@ -1087,12 +1107,12 @@ where
             ValueKind::Path => {
                 // SAFETY: the value's kind is a path.
                 match unsafe { value.into_path_string(ctx)? }.into() {
-                    Cow::Borrowed(cstr) => {
-                        let os_str = OsStr::from_bytes(cstr.to_bytes());
+                    Cow::Borrowed(c_str) => {
+                        let os_str = OsStr::from_bytes(c_str.to_bytes());
                         Ok(Cow::Borrowed(Path::new(os_str)))
                     },
-                    Cow::Owned(cstring) => {
-                        let os_str = OsStr::from_bytes(cstring.to_bytes());
+                    Cow::Owned(c_string) => {
+                        let os_str = OsStr::from_bytes(c_string.to_bytes());
                         Ok(Cow::Owned(Path::new(os_str).to_owned()))
                     },
                 }
@@ -1135,7 +1155,7 @@ impl<Owner: ValueOwner> TryFromValue<NixValue<Owner>>
                 // SAFETY: the value's kind is a string.
                 unsafe {
                     value.with_string(
-                        |cstr| res = cstr.to_str().map(Into::into),
+                        |c_str| res = c_str.to_str().map(Into::into),
                         ctx,
                     )?
                 };
