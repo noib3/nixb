@@ -193,10 +193,11 @@ unsafe extern "C" {
     /// This is what `nix_init_path_string` SHOULD do, but it causes the primop
     /// callback it's used in to segfault *after* the Rust code completes.
     pub fn init_path_string(
+        context: *mut c_context,
         state: *mut EvalState,
         value: *mut Value,
         path_str: *const c_char,
-    );
+    ) -> err;
 }
 
 unsafe extern "C" {

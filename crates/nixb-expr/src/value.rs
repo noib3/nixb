@@ -320,10 +320,17 @@ impl Value for Null {
     }
 
     #[inline]
-    fn write(self, dest: UninitValue, ctx: &mut Context) -> Result<()> {
-        ctx.with_raw(|ctx| unsafe {
-            nixb_sys::init_null(ctx, dest.as_ptr());
-        })
+    fn write(self, dest: UninitValue, _: &mut Context) -> Result<()> {
+        // `nix_init_null` errors when:
+        //
+        // 1. the destination pointer is null;
+        // 2. the destination value is already initialized.
+        //
+        // Having an `UninitValue` guards against both, so neither can happen.
+        unsafe {
+            nixb_sys::init_null(ptr::null_mut(), dest.as_ptr());
+        }
+        Ok(())
     }
 }
 
@@ -521,10 +528,17 @@ impl Value for bool {
     }
 
     #[inline]
-    fn write(self, dest: UninitValue, ctx: &mut Context) -> Result<()> {
-        ctx.with_raw(|ctx| unsafe {
-            nixb_sys::init_bool(ctx, dest.as_ptr(), self);
-        })
+    fn write(self, dest: UninitValue, _: &mut Context) -> Result<()> {
+        // `nix_init_bool` errors when:
+        //
+        // 1. the destination pointer is null;
+        // 2. the destination value is already initialized.
+        //
+        // Having an `UninitValue` guards against both, so neither can happen.
+        unsafe {
+            nixb_sys::init_bool(ptr::null_mut(), dest.as_ptr(), self);
+        }
+        Ok(())
     }
 }
 
@@ -537,10 +551,22 @@ macro_rules! impl_value_for_int {
             }
 
             #[inline]
-            fn write(self, dest: UninitValue, ctx: &mut Context) -> Result<()> {
-                ctx.with_raw(|ctx| unsafe {
-                    nixb_sys::init_int(ctx, dest.as_ptr(), self.into());
-                })
+            fn write(self, dest: UninitValue, _: &mut Context) -> Result<()> {
+                // `nix_init_int` errors when:
+                //
+                // 1. the destination pointer is null;
+                // 2. the destination value is already initialized.
+                //
+                // Having an `UninitValue` guards against both, so neither can
+                // happen.
+                unsafe {
+                    nixb_sys::init_int(
+                        ptr::null_mut(),
+                        dest.as_ptr(),
+                        self.into(),
+                    );
+                }
+                Ok(())
             }
         }
 
@@ -598,10 +624,22 @@ macro_rules! impl_value_for_float {
             }
 
             #[inline]
-            fn write(self, dest: UninitValue, ctx: &mut Context) -> Result<()> {
-                ctx.with_raw(|ctx| unsafe {
-                    nixb_sys::init_float(ctx, dest.as_ptr(), self.into());
-                })
+            fn write(self, dest: UninitValue, _: &mut Context) -> Result<()> {
+                // `nix_init_float` errors when:
+                //
+                // 1. the destination pointer is null;
+                // 2. the destination value is already initialized.
+                //
+                // Having an `UninitValue` guards against both, so neither can
+                // happen.
+                unsafe {
+                    nixb_sys::init_float(
+                        ptr::null_mut(),
+                        dest.as_ptr(),
+                        self.into(),
+                    );
+                }
+                Ok(())
             }
         }
     };
@@ -618,9 +656,20 @@ impl Value for &CStr {
 
     #[inline]
     fn write(self, dest: UninitValue, ctx: &mut Context) -> Result<()> {
+        // `nix_init_string` errors when:
+        //
+        // 1. the destination pointer is null;
+        // 2. the destination value is already initialized;
+        // 3. allocating storage for the string fails.
+        //
+        // Having an `UninitValue` guards against 1) and 2), while 3) is an
+        // allocation failure which we panic on.
         ctx.with_raw(|ctx| unsafe {
             nixb_sys::init_string(ctx, dest.as_ptr(), self.as_ptr());
         })
+        .unwrap_or_else(|err| panic!("failed to allocate Nix string: {err}"));
+
+        Ok(())
     }
 }
 
@@ -736,20 +785,25 @@ impl Value for &std::path::Path {
         let bytes = self.as_os_str().as_encoded_bytes();
         let cstring = CString::new(bytes)?;
 
-        #[cfg(not(feature = "nix-2-34"))]
-        {
-            unsafe {
-                nixb_cpp::init_path_string(
-                    ctx.state_ptr(),
-                    dest.as_ptr(),
-                    cstring.as_ptr(),
-                );
-            }
-            Ok(())
-        }
-
-        #[cfg(feature = "nix-2-34")]
+        // `nix_init_path_string` errors when:
+        //
+        // 1. the destination pointer is null;
+        // 2. the destination value is already initialized;
+        // 3. canonicalizing or storing the path fails to allocate;
+        // 4. the path exceeds an internal container's maximum capacity.
+        //
+        // Having an `UninitValue` guards against 1) and 2), while 3) and 4) are
+        // allocation/capacity failures which we panic on.
         ctx.with_raw_and_state(|ctx, state| unsafe {
+            #[cfg(not(feature = "nix-2-34"))]
+            nixb_cpp::init_path_string(
+                ctx,
+                state.as_ptr(),
+                dest.as_ptr(),
+                cstring.as_ptr(),
+            );
+
+            #[cfg(feature = "nix-2-34")]
             nixb_sys::init_path_string(
                 ctx,
                 state.as_ptr(),
@@ -757,6 +811,11 @@ impl Value for &std::path::Path {
                 cstring.as_ptr(),
             );
         })
+        .unwrap_or_else(|err| {
+            panic!("failed to allocate or canonicalize Nix path: {err}")
+        });
+
+        Ok(())
     }
 }
 

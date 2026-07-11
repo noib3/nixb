@@ -254,9 +254,15 @@ extern "C" nix_err force_value(nix_c_context *context, nix::EvalState *state,
   NIXC_CATCH_ERRS
 }
 
-extern "C" void init_path_string(nix::EvalState *state, nix::Value *value,
-                                 const char *str) {
-  value->mkPath(state->rootPath(nix::CanonPath(str)), state->mem);
+extern "C" nix_err init_path_string(nix_c_context *context,
+                                    nix::EvalState *state, nix::Value *value,
+                                    const char *str) {
+  if (context)
+    context->last_err_code = NIX_OK;
+  try {
+    value->mkPath(state->rootPath(nix::CanonPath(str)), state->mem);
+  }
+  NIXC_CATCH_ERRS
 }
 
 extern "C" nix_err value_call_multi(nix_c_context *context,
