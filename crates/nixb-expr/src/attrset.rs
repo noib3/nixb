@@ -112,7 +112,7 @@ pub trait Attrset {
         }
 
         let iter = self.into_attrset_iter(ctx);
-        let builder = ctx.make_attrset_builder(iter.len() as usize)?;
+        let builder = ctx.make_attrset_builder(iter.len());
         if iter.is_exhausted() {
             builder.build(dest)
         } else {

@@ -1,6 +1,6 @@
 //! TODO: docs.
 
-use core::ffi::CStr;
+use core::ffi::{CStr, c_uint};
 use core::marker::PhantomData;
 use core::ops::{Deref, DerefMut};
 use core::ptr::NonNull;
@@ -99,75 +99,6 @@ impl<'eval> Context<'eval> {
         T::try_from_value(NixValue::new(owner), self)
     }
 
-    /// Creates a new [`AttrsetBuilder`] with the given capacity.
-    #[inline]
-    pub(crate) fn make_attrset_builder(
-        &mut self,
-        capacity: usize,
-    ) -> Result<AttrsetBuilder<'_, 'eval>> {
-        unsafe {
-            #[cfg(not(feature = "nix-2-34"))]
-            let builder_ptr =
-                nixb_cpp::make_bindings_builder(self.state.as_ptr(), capacity);
-
-            #[cfg(feature = "nix-2-34")]
-            let builder_ptr = self.inner.with_ptr(|ptr| {
-                nixb_sys::make_bindings_builder(
-                    ptr,
-                    self.state.as_ptr(),
-                    capacity,
-                )
-            })?;
-
-            match NonNull::new(builder_ptr) {
-                Some(builder_ptr) => {
-                    Ok(AttrsetBuilder { inner: builder_ptr, context: self })
-                },
-                None => Err(Error::new(
-                    ErrorKind::Overflow,
-                    c"failed to create AttrsetBuilder",
-                )),
-            }
-        }
-    }
-
-    /// Creates a new [`ListBuilder`] with the given capacity.
-    #[inline]
-    pub(crate) fn make_list_builder(
-        &mut self,
-        capacity: usize,
-    ) -> Result<ListBuilder<'_, 'eval>> {
-        unsafe {
-            #[cfg(not(feature = "nix-2-34"))]
-            let builder_ptr =
-                nixb_cpp::make_list_builder(self.state.as_ptr(), capacity);
-
-            #[cfg(feature = "nix-2-34")]
-            let builder_ptr = self.inner.with_ptr(|ptr| {
-                nixb_sys::make_list_builder(ptr, self.state.as_ptr(), capacity)
-            })?;
-
-            match NonNull::new(builder_ptr) {
-                Some(builder_ptr) => Ok(ListBuilder {
-                    inner: builder_ptr,
-                    context: self,
-                    index: 0,
-                }),
-                None => Err(Error::new(
-                    ErrorKind::Overflow,
-                    c"failed to create ListBuilder",
-                )),
-            }
-        }
-    }
-
-    #[inline]
-    pub(crate) fn state_ptr(&mut self) -> *mut nixb_sys::EvalState {
-        self.state.as_ptr()
-    }
-}
-
-impl<'eval> Context<'eval> {
     /// TODO: docs.
     #[inline]
     pub fn new_value(&mut self, value: impl Value) -> Result<NixValue> {
@@ -193,9 +124,83 @@ impl<'eval> Context<'eval> {
         self.inner
     }
 
+    /// Creates a new [`AttrsetBuilder`] with the given capacity.
+    #[inline]
+    pub(crate) fn make_attrset_builder(
+        &mut self,
+        capacity: c_uint,
+    ) -> AttrsetBuilder<'_, 'eval> {
+        unsafe {
+            #[cfg(not(feature = "nix-2-34"))]
+            let builder_ptr = nixb_cpp::make_bindings_builder(
+                self.state.as_ptr(),
+                capacity as _,
+            );
+
+            #[cfg(feature = "nix-2-34")]
+            let builder_ptr = self
+                .inner
+                .with_ptr(|ptr| {
+                    nixb_sys::make_bindings_builder(
+                        ptr,
+                        self.state.as_ptr(),
+                        capacity as _,
+                    )
+                })
+                .unwrap_or_else(|err| {
+                    panic!("failed to allocate attrset builder: {err}")
+                });
+
+            let builder_ptr = NonNull::new(builder_ptr).expect(
+                "nix_make_bindings_builder returned null without setting an \
+                 error",
+            );
+
+            AttrsetBuilder { inner: builder_ptr, context: self }
+        }
+    }
+
+    /// Creates a new [`ListBuilder`] with the given capacity.
+    #[inline]
+    pub(crate) fn make_list_builder(
+        &mut self,
+        capacity: c_uint,
+    ) -> ListBuilder<'_, 'eval> {
+        unsafe {
+            #[cfg(not(feature = "nix-2-34"))]
+            let builder_ptr =
+                nixb_cpp::make_list_builder(self.state.as_ptr(), capacity as _);
+
+            #[cfg(feature = "nix-2-34")]
+            let builder_ptr = self
+                .inner
+                .with_ptr(|ptr| {
+                    nixb_sys::make_list_builder(
+                        ptr,
+                        self.state.as_ptr(),
+                        capacity as _,
+                    )
+                })
+                .unwrap_or_else(|err| {
+                    panic!("failed to allocate list builder: {err}")
+                });
+
+            let builder_ptr = NonNull::new(builder_ptr).expect(
+                "nix_make_list_builder returned null without setting an error",
+            );
+
+            ListBuilder { inner: builder_ptr, context: self, index: 0 }
+        }
+    }
+
     #[inline]
     pub(crate) fn new(inner: CContext, state: EvalState<'eval>) -> Self {
         Self { inner, state }
+    }
+
+    #[inline]
+    pub(crate) fn state_ptr(&mut self) -> *mut nixb_sys::EvalState {
+        self.state.as_ptr()
     }
 
     #[inline]
