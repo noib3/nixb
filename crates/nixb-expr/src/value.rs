@@ -852,19 +852,6 @@ impl PathValue for std::path::PathBuf {
     }
 }
 
-#[cfg(feature = "std")]
-impl Value for &std::ffi::OsStr {
-    #[inline(always)]
-    fn kind(&self) -> ValueKind {
-        ValueKind::Path
-    }
-
-    #[inline(always)]
-    fn write(self, dest: UninitValue, ctx: &mut Context) -> Result<()> {
-        CString::new(self.as_encoded_bytes())?.write(dest, ctx)
-    }
-}
-
 #[cfg(feature = "compact_str")]
 impl Value for compact_str::CompactString {
     #[inline]
