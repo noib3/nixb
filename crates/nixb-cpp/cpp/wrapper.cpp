@@ -26,16 +26,26 @@ static nix_value *borrow_nix_value(nix::Value *value, nix::EvalMemory &mem) {
 
 #ifndef NIX_2_34
 extern "C" nix::BindingsBuilder *make_bindings_builder(nix::EvalState *state,
-                                                       size_t capacity) {
-  // buildBindings returns by value, so we allocate on heap.
-  auto *builder = new nix::BindingsBuilder(state->buildBindings(capacity));
-  return builder;
+                                                       size_t capacity) noexcept {
+  try {
+    // buildBindings returns by value, so we allocate on heap.
+    return new nix::BindingsBuilder(state->buildBindings(capacity));
+  } catch (...) {
+    return nullptr;
+  }
 }
 
-extern "C" void bindings_builder_insert(nix::BindingsBuilder *builder,
-                                        const char *name, nix::Value *value) {
-  nix::Symbol sym = builder->symbols.get().create(name);
-  builder->insert(sym, value);
+extern "C" nix_err bindings_builder_insert(nix_c_context *context,
+                                           nix::BindingsBuilder *builder,
+                                           const char *name,
+                                           nix::Value *value) {
+  if (context)
+    context->last_err_code = NIX_OK;
+  try {
+    nix::Symbol sym = builder->symbols.get().create(name);
+    builder->insert(sym, value);
+  }
+  NIXC_CATCH_ERRS
 }
 
 extern "C" void make_attrs(nix::Value *v, nix::BindingsBuilder *builder) {
@@ -162,9 +172,12 @@ extern "C" nix_err expr_eval_from_string(nix_c_context *context,
 
 #ifndef NIX_2_34
 extern "C" nix::ListBuilder *make_list_builder(nix::EvalState *state,
-                                               size_t size) {
-  auto *builder = new nix::ListBuilder(state->buildList(size));
-  return builder;
+                                               size_t size) noexcept {
+  try {
+    return new nix::ListBuilder(state->buildList(size));
+  } catch (...) {
+    return nullptr;
+  }
 }
 
 extern "C" void list_builder_insert(nix::ListBuilder *builder, size_t index,
@@ -221,10 +234,14 @@ extern "C" nix_realised_string *string_realise(nix_c_context *context,
 // Values.
 
 #ifndef NIX_2_34
-extern "C" nix::Value *alloc_value(nix::EvalState *state) {
-  nix::Value *res = state->allocValue();
-  nix_gc_incref(nullptr, res);
-  return res;
+extern "C" nix::Value *alloc_value(nix::EvalState *state) noexcept {
+  try {
+    nix::Value *res = state->allocValue();
+    nix_gc_incref(nullptr, res);
+    return res;
+  } catch (...) {
+    return nullptr;
+  }
 }
 
 extern "C" nix_err force_value(nix_c_context *context, nix::EvalState *state,

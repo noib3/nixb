@@ -6,7 +6,7 @@ use core::ops::{Deref, DerefMut};
 use core::ptr::NonNull;
 
 use nixb_c_context::CContext;
-use nixb_error::{Error, ErrorKind, Result};
+use nixb_error::Result;
 
 use crate::attrset::NixAttrset;
 use crate::builtins::Builtins;
@@ -71,7 +71,7 @@ impl<'eval> Context<'eval> {
     where
         T: TryFromValue<NixValue>,
     {
-        let dest = self.alloc_value()?;
+        let dest = self.alloc_value();
 
         self.with_raw_and_state(|raw_ctx, state| unsafe {
             #[cfg(not(feature = "nix-2-34"))]
@@ -102,7 +102,7 @@ impl<'eval> Context<'eval> {
     /// TODO: docs.
     #[inline]
     pub fn new_value(&mut self, value: impl Value) -> Result<NixValue> {
-        let dest = self.alloc_value()?;
+        let dest = self.alloc_value();
 
         if let Err(err) = value.write(dest, self) {
             let _ = self.with_raw(|ctx| unsafe {
@@ -117,6 +117,32 @@ impl<'eval> Context<'eval> {
         let owner = unsafe { Owned::new(dest.as_non_null()) };
 
         Ok(NixValue::new(owner))
+    }
+
+    /// Allocates a new, uninitialized value, returning a pointer to it.
+    ///
+    /// The caller is responsible for freeing the value by calling
+    /// [`nixb_sys::value_decref`] once it is no longer needed.
+    #[inline]
+    pub(crate) fn alloc_value(&mut self) -> UninitValue {
+        #[cfg(not(feature = "nix-2-34"))]
+        let raw_ptr = unsafe { nixb_cpp::alloc_value(self.state.as_ptr()) };
+
+        #[cfg(feature = "nix-2-34")]
+        let raw_ptr = self
+            .inner
+            .with_ptr(|ctx| unsafe {
+                nixb_sys::alloc_value(ctx, self.state.as_ptr())
+            })
+            .unwrap_or_else(|err| {
+                panic!("failed to allocate Nix value: {err}")
+            });
+
+        let non_null_ptr =
+            NonNull::new(raw_ptr).expect("failed to allocate Nix value");
+
+        // SAFETY: `alloc_value` returns a pointer to an uninitialized value.
+        unsafe { UninitValue::new(non_null_ptr) }
     }
 
     #[inline]
@@ -221,31 +247,6 @@ impl<'eval> Context<'eval> {
 }
 
 impl<'eval> EvalState<'eval> {
-    /// Allocates a new, uninitialized value, returning a pointer to it.
-    ///
-    /// The caller is responsible for freeing the value by calling
-    /// [`nixb_sys::value_decref`] once it is no longer needed.
-    #[inline]
-    pub(crate) fn alloc_value(&mut self) -> Result<UninitValue> {
-        #[cfg(not(feature = "nix-2-34"))]
-        let raw_ptr = unsafe { nixb_cpp::alloc_value(self.inner.as_ptr()) };
-
-        #[cfg(feature = "nix-2-34")]
-        let raw_ptr = unsafe {
-            nixb_sys::alloc_value(core::ptr::null_mut(), self.inner.as_ptr())
-        };
-
-        let Some(non_null_ptr) = NonNull::new(raw_ptr) else {
-            return Err(Error::new(
-                ErrorKind::Overflow,
-                c"failed to allocate Value",
-            ));
-        };
-
-        // SAFETY: `alloc_value` returns a pointer to an uninitialized value.
-        Ok(unsafe { UninitValue::new(non_null_ptr) })
-    }
-
     #[inline]
     pub(crate) fn as_ptr(&mut self) -> *mut nixb_sys::EvalState {
         self.inner.as_ptr()
@@ -263,7 +264,6 @@ impl<'eval> AttrsetBuilder<'_, 'eval> {
         #[cfg(not(feature = "nix-2-34"))]
         unsafe {
             nixb_cpp::make_attrs(dest.as_ptr(), self.inner.as_ptr());
-            Ok(())
         }
 
         // `nix_make_attrs` errors when:
@@ -291,30 +291,38 @@ impl<'eval> AttrsetBuilder<'_, 'eval> {
         key: &CStr,
         write_value: impl FnOnce(UninitValue, &mut Context) -> Result<()>,
     ) -> Result<()> {
-        let dest = self.context.alloc_value()?;
+        assert!(
+            key.to_bytes().len() < u32::MAX as usize,
+            "attribute name exceeds Nix's 4 GiB limit",
+        );
+
+        let dest = self.context.alloc_value();
 
         write_value(dest, self.context)?;
 
-        #[cfg(not(feature = "nix-2-34"))]
-        unsafe {
-            nixb_cpp::bindings_builder_insert(
-                self.inner.as_ptr(),
-                key.as_ptr(),
-                dest.as_ptr(),
-            );
+        self.context
+            .with_raw(|ctx| unsafe {
+                #[cfg(not(feature = "nix-2-34"))]
+                nixb_cpp::bindings_builder_insert(
+                    ctx,
+                    self.inner.as_ptr(),
+                    key.as_ptr(),
+                    dest.as_ptr(),
+                );
 
-            Ok(())
-        }
+                #[cfg(feature = "nix-2-34")]
+                nixb_sys::bindings_builder_insert(
+                    ctx,
+                    self.inner.as_ptr(),
+                    key.as_ptr(),
+                    dest.as_ptr(),
+                );
+            })
+            .unwrap_or_else(|err| {
+                panic!("failed to intern attribute name: {err}")
+            });
 
-        #[cfg(feature = "nix-2-34")]
-        self.context.with_raw(|ctx| unsafe {
-            nixb_sys::bindings_builder_insert(
-                ctx,
-                self.inner.as_ptr(),
-                key.as_ptr(),
-                dest.as_ptr(),
-            );
-        })
+        Ok(())
     }
 }
 
@@ -324,7 +332,6 @@ impl<'eval> ListBuilder<'_, 'eval> {
         #[cfg(not(feature = "nix-2-34"))]
         unsafe {
             nixb_cpp::make_list(dest.as_ptr(), self.inner.as_ptr());
-            Ok(())
         }
 
         // `nix_make_list` errors when:
@@ -348,7 +355,7 @@ impl<'eval> ListBuilder<'_, 'eval> {
         &mut self,
         write_value: impl FnOnce(UninitValue, &mut Context) -> Result<()>,
     ) -> Result<()> {
-        let dest = self.context.alloc_value()?;
+        let dest = self.context.alloc_value();
         write_value(dest, self.context)?;
 
         #[cfg(not(feature = "nix-2-34"))]
@@ -360,15 +367,18 @@ impl<'eval> ListBuilder<'_, 'eval> {
             );
         }
 
+        // `nix_list_builder_insert` only errors when the value pointer is
+        // null. Having an `UninitValue` guards against that, so it cannot
+        // happen.
         #[cfg(feature = "nix-2-34")]
-        self.context.with_raw(|ctx| unsafe {
+        unsafe {
             nixb_sys::list_builder_insert(
-                ctx,
+                core::ptr::null_mut(),
                 self.inner.as_ptr(),
                 self.index.try_into().unwrap_or(u32::MAX),
                 dest.as_ptr(),
-            )
-        })?;
+            );
+        }
 
         self.index += 1;
         Ok(())

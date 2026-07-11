@@ -313,7 +313,7 @@ pub fn function<'a, A: Args<'a>>(
 
         value.force_inline(ctx)?;
 
-        let dest = ctx.alloc_value()?;
+        let dest = ctx.alloc_value();
         value.write(dest, ctx)?;
 
         // SAFETY: `write` initialized the allocated destination value.

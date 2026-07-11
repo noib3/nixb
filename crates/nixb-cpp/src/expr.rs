@@ -24,10 +24,11 @@ unsafe extern "C" {
 
     /// Insert a key-value pair into the bindings builder.
     pub fn bindings_builder_insert(
+        context: *mut c_context,
         builder: *mut BindingsBuilder,
         name: *const c_char,
         value: *mut Value,
-    );
+    ) -> err;
 
     /// Free a bindings builder.
     pub fn bindings_builder_free(builder: *mut BindingsBuilder);

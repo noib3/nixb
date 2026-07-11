@@ -28,8 +28,8 @@ pub trait Callable {
     /// TODO: docs.
     #[inline]
     fn call(&self, arg: impl IntoValue, ctx: &mut Context) -> Result<NixThunk> {
-        let dest_val = ctx.alloc_value()?;
-        let arg_val = ctx.alloc_value()?;
+        let dest_val = ctx.alloc_value();
+        let arg_val = ctx.alloc_value();
 
         let res = arg.into_value(ctx).write(arg_val, ctx).and_then(|()| {
             ctx.with_raw(|ctx| {
@@ -108,7 +108,7 @@ pub trait Callable {
                 return Ok(());
             };
             let (first_arg, rest_args) = args.split_first();
-            let dest = ctx.alloc_value()?;
+            let dest = ctx.alloc_value();
             first_arg.into_value(ctx).write(dest, ctx)?;
             *first_ptr = dest.as_ptr();
             *num_written += 1;
@@ -124,7 +124,7 @@ pub trait Callable {
 
         let args_slice = &mut args_array.as_mut()[..];
 
-        let dest = ctx.alloc_value()?;
+        let dest = ctx.alloc_value();
 
         let res = init_args_array(args, args_slice, &mut num_written, ctx)
             .and_then(|()| {
