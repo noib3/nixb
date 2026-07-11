@@ -55,7 +55,7 @@ pub trait List {
             }
 
             #[inline(always)]
-            fn write(self, dest: UninitValue, ctx: &mut Context) -> Result<()> {
+            fn write(self, dest: UninitValue, ctx: &mut Context) {
                 List::write(self.0, dest, ctx)
             }
         }
@@ -65,7 +65,7 @@ pub trait List {
 
     /// TODO: docs.
     #[inline]
-    fn write(self, dest: UninitValue, ctx: &mut Context) -> Result<()>
+    fn write(self, dest: UninitValue, ctx: &mut Context)
     where
         Self: Sized,
     {
@@ -73,19 +73,18 @@ pub trait List {
             dest: UninitValue,
         }
 
-        impl FnOnceValueIter<ListBuilder<'_, '_>, Result<()>> for WriteNext {
+        impl FnOnceValueIter<ListBuilder<'_, '_>, ()> for WriteNext {
             #[inline]
             fn call(
                 self,
                 value: impl Value,
                 rest: impl ListIterator,
                 mut builder: ListBuilder<'_, '_>,
-            ) -> Result<()> {
-                builder.insert(|dest, ctx| value.write(dest, ctx))?;
+            ) {
+                builder.insert(|dest, ctx| value.write(dest, ctx));
 
                 if rest.is_exhausted() {
                     builder.build(self.dest);
-                    Ok(())
                 } else {
                     rest.with_next(self, builder)
                 }
@@ -96,7 +95,6 @@ pub trait List {
         let builder = ctx.make_list_builder(iter.len());
         if iter.is_exhausted() {
             builder.build(dest);
-            Ok(())
         } else {
             iter.with_next(WriteNext { dest }, builder)
         }
@@ -303,7 +301,7 @@ impl<Owner: ValueOwner> Value for NixList<Owner> {
     }
 
     #[inline]
-    fn write(self, dest: UninitValue, ctx: &mut Context) -> Result<()> {
+    fn write(self, dest: UninitValue, ctx: &mut Context) {
         self.inner.write(dest, ctx)
     }
 }
@@ -357,7 +355,7 @@ impl<V: Values> Value for StaticList<V> {
     }
 
     #[inline]
-    fn write(self, dest: UninitValue, ctx: &mut Context) -> Result<()> {
+    fn write(self, dest: UninitValue, ctx: &mut Context) {
         List::write(self, dest, ctx)
     }
 }
@@ -439,7 +437,7 @@ where
     }
 
     #[inline]
-    fn write(self, dest: UninitValue, ctx: &mut Context) -> Result<()> {
+    fn write(self, dest: UninitValue, ctx: &mut Context) {
         List::write(self, dest, ctx)
     }
 }

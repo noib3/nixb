@@ -31,17 +31,17 @@ pub trait Callable {
         let dest_val = ctx.alloc_value();
         let arg_val = ctx.alloc_value();
 
-        let res = arg.into_value(ctx).write(arg_val, ctx).and_then(|()| {
-            ctx.with_raw(|ctx| {
-                unsafe {
-                    nixb_sys::init_apply(
-                        ctx,
-                        dest_val.as_ptr(),
-                        self.value_ptr(),
-                        arg_val.as_ptr(),
-                    )
-                };
-            })
+        arg.into_value(ctx).write(arg_val, ctx);
+
+        let res = ctx.with_raw(|ctx| {
+            unsafe {
+                nixb_sys::init_apply(
+                    ctx,
+                    dest_val.as_ptr(),
+                    self.value_ptr(),
+                    arg_val.as_ptr(),
+                )
+            };
         });
 
         // Free the argument once we're done with it.
@@ -102,14 +102,14 @@ pub trait Callable {
             slice: &mut [*mut nixb_sys::Value],
             num_written: &mut usize,
             ctx: &mut Context,
-        ) -> Result<()> {
+        ) {
             debug_assert_eq!(Args::LEN, slice.len());
             let Some((first_ptr, rest_slice)) = slice.split_first_mut() else {
-                return Ok(());
+                return;
             };
             let (first_arg, rest_args) = args.split_first();
             let dest = ctx.alloc_value();
-            first_arg.into_value(ctx).write(dest, ctx)?;
+            first_arg.into_value(ctx).write(dest, ctx);
             *first_ptr = dest.as_ptr();
             *num_written += 1;
             init_args_array(rest_args, rest_slice, num_written, ctx)
@@ -126,30 +126,31 @@ pub trait Callable {
 
         let dest = ctx.alloc_value();
 
-        let res = init_args_array(args, args_slice, &mut num_written, ctx)
-            .and_then(|()| {
-                ctx.with_raw_and_state(|ctx, state| unsafe {
-                    #[cfg(not(feature = "nix-2-34"))]
-                    nixb_cpp::value_call_multi(
-                        ctx,
-                        state.as_ptr(),
-                        self.value_ptr(),
-                        args_slice.len(),
-                        args_slice.as_mut_ptr(),
-                        dest.as_ptr(),
-                    );
+        init_args_array(args, args_slice, &mut num_written, ctx);
 
-                    #[cfg(feature = "nix-2-34")]
-                    nixb_sys::value_call_multi(
-                        ctx,
-                        state.as_ptr(),
-                        self.value_ptr(),
-                        args_slice.len(),
-                        args_slice.as_mut_ptr(),
-                        dest.as_ptr(),
-                    );
-                })
-            });
+        let res = {
+            ctx.with_raw_and_state(|ctx, state| unsafe {
+                #[cfg(not(feature = "nix-2-34"))]
+                nixb_cpp::value_call_multi(
+                    ctx,
+                    state.as_ptr(),
+                    self.value_ptr(),
+                    args_slice.len(),
+                    args_slice.as_mut_ptr(),
+                    dest.as_ptr(),
+                );
+
+                #[cfg(feature = "nix-2-34")]
+                nixb_sys::value_call_multi(
+                    ctx,
+                    state.as_ptr(),
+                    self.value_ptr(),
+                    args_slice.len(),
+                    args_slice.as_mut_ptr(),
+                    dest.as_ptr(),
+                );
+            })
+        };
 
         // Free the arguments once we're done with them.
         for &raw_arg in &args_slice[..num_written] {
@@ -263,7 +264,7 @@ impl<Owner: ValueOwner> Value for NixFunctor<Owner> {
     }
 
     #[inline]
-    fn write(self, dest: UninitValue, ctx: &mut Context) -> Result<()> {
+    fn write(self, dest: UninitValue, ctx: &mut Context) {
         self.inner.write(dest, ctx)
     }
 }
@@ -308,7 +309,7 @@ impl<Owner: ValueOwner> Value for NixLambda<Owner> {
     }
 
     #[inline]
-    fn write(self, dest: UninitValue, ctx: &mut Context) -> Result<()> {
+    fn write(self, dest: UninitValue, ctx: &mut Context) {
         self.inner.write(dest, ctx)
     }
 }

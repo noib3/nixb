@@ -16,26 +16,12 @@ pub struct TypeMismatchError {
     pub found: ValueKind,
 }
 
-/// The type of error that can occur when trying to convert a integer into an
-/// `i64` where `Int` doesn't implement `Into<i64>`.
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
-pub struct TryIntoI64Error<Int> {
-    int: Int,
-}
-
 /// The type of error that can occur when trying to convert an `i64` into a
 /// different integer type.
 #[derive(Copy, Clone, PartialEq, Eq)]
 pub struct TryFromI64Error<Int> {
     n: i64,
     int: PhantomData<Int>,
-}
-
-impl<Int> TryIntoI64Error<Int> {
-    #[inline]
-    pub(crate) fn new(int: Int) -> Self {
-        Self { int }
-    }
 }
 
 impl<Int> TryFromI64Error<Int> {
@@ -57,29 +43,6 @@ impl fmt::Display for TypeMismatchError {
 }
 
 impl core::error::Error for TypeMismatchError {}
-
-impl<Int: fmt::Display> fmt::Display for TryIntoI64Error<Int> {
-    #[inline]
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "integer conversion failed: cannot convert {} into i64",
-            self.int,
-        )
-    }
-}
-
-impl<Int: fmt::Debug + fmt::Display> core::error::Error
-    for TryIntoI64Error<Int>
-{
-}
-
-impl<Int: fmt::Display> From<TryIntoI64Error<Int>> for nixb_error::Error {
-    #[inline]
-    fn from(err: TryIntoI64Error<Int>) -> Self {
-        Self::from_message(err)
-    }
-}
 
 impl<Int> fmt::Debug for TryFromI64Error<Int> {
     #[inline]

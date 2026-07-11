@@ -54,7 +54,7 @@ pub trait Function {
             }
 
             #[inline]
-            fn write(self, dest: UninitValue, ctx: &mut Context) -> Result<()> {
+            fn write(self, dest: UninitValue, ctx: &mut Context) {
                 Function::write(self.0, dest, ctx)
             }
         }
@@ -139,7 +139,9 @@ pub trait Function {
                 // [docs]: https://github.com/NixOS/nix/blob/af0ac14/src/libexpr-c/nix_api_value.h#L564
                 value.force_inline(&mut ctx)?;
 
-                value.write(dest, &mut ctx)
+                value.write(dest, &mut ctx);
+
+                Ok::<_, nixb_error::Error>(())
             };
 
             if let Err(err) = try_block() {
@@ -207,7 +209,7 @@ pub trait Function {
 
     #[doc(hidden)]
     #[inline]
-    fn write(self, dest: UninitValue, ctx: &mut Context) -> Result<()>
+    fn write(self, dest: UninitValue, ctx: &mut Context)
     where
         Self: Sized + 'static,
     {
@@ -265,8 +267,6 @@ pub trait Function {
         init_res.unwrap_or_else(|err| {
             panic!("failed to allocate Nix function: {err}")
         });
-
-        Ok(())
     }
 }
 
@@ -341,7 +341,7 @@ pub fn function<'a, A: Args<'a>>(
         value.force_inline(ctx)?;
 
         let dest = ctx.alloc_value();
-        value.write(dest, ctx)?;
+        value.write(dest, ctx);
 
         // SAFETY: `write` initialized the allocated destination value.
         let owner = unsafe { crate::value::Owned::new(dest.as_non_null()) };
@@ -378,7 +378,7 @@ pub fn function<'a, A: Args<'a>>(
         }
 
         #[inline]
-        fn write(self, dest: UninitValue, ctx: &mut Context) -> Result<()> {
+        fn write(self, dest: UninitValue, ctx: &mut Context) {
             Function::write(self, dest, ctx)
         }
     }

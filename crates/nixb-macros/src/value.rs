@@ -89,7 +89,7 @@ pub(crate) fn expand(input: DeriveInput) -> syn::Result<TokenStream> {
                 self,
                 #dest: ::nixb::expr::value::UninitValue,
                 #ctx: &mut ::nixb::expr::context::Context,
-            ) -> ::nixb::Result<()> {
+            ) {
                 match self {
                     #(#write_arms)*
                 }

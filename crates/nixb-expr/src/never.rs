@@ -15,7 +15,7 @@ impl Value for Never {
     }
 
     #[inline]
-    fn write(self, _: UninitValue, _: &mut Context) -> nixb_error::Result<()> {
+    fn write(self, _: UninitValue, _: &mut Context) {
         match self {}
     }
 }

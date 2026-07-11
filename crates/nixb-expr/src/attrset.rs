@@ -72,7 +72,7 @@ pub trait Attrset {
             }
 
             #[inline(always)]
-            fn write(self, dest: UninitValue, ctx: &mut Context) -> Result<()> {
+            fn write(self, dest: UninitValue, ctx: &mut Context) {
                 Attrset::write(self.0, dest, ctx)
             }
         }
@@ -82,7 +82,7 @@ pub trait Attrset {
 
     #[doc(hidden)]
     #[inline]
-    fn write(self, dest: UninitValue, ctx: &mut Context) -> Result<()>
+    fn write(self, dest: UninitValue, ctx: &mut Context)
     where
         Self: Sized,
     {
@@ -90,7 +90,7 @@ pub trait Attrset {
             dest: UninitValue,
         }
 
-        impl FnOnceKeyValueIter<AttrsetBuilder<'_, '_>, Result<()>> for WriteNext {
+        impl FnOnceKeyValueIter<AttrsetBuilder<'_, '_>, ()> for WriteNext {
             #[inline]
             fn call(
                 self,
@@ -98,14 +98,13 @@ pub trait Attrset {
                 value: impl Value,
                 rest: impl AttrsetIterator,
                 mut builder: AttrsetBuilder<'_, '_>,
-            ) -> Result<()> {
+            ) {
                 key.with_cstr(|key| {
                     builder.insert(key, |dest, ctx| value.write(dest, ctx))
-                })?;
+                });
 
                 if rest.is_exhausted() {
                     builder.build(self.dest);
-                    Ok(())
                 } else {
                     rest.with_next(self, builder)
                 }
@@ -116,7 +115,6 @@ pub trait Attrset {
         let builder = ctx.make_attrset_builder(iter.len());
         if iter.is_exhausted() {
             builder.build(dest);
-            Ok(())
         } else {
             iter.with_next(WriteNext { dest }, builder)
         }
@@ -711,7 +709,7 @@ impl<Owner: ValueOwner> Value for NixAttrset<Owner> {
     }
 
     #[inline]
-    fn write(self, dest: UninitValue, ctx: &mut Context) -> Result<()> {
+    fn write(self, dest: UninitValue, ctx: &mut Context) {
         self.inner.write(dest, ctx)
     }
 }
@@ -785,7 +783,7 @@ impl<Owner: ValueOwner> Value for NixDerivation<Owner> {
     }
 
     #[inline]
-    fn write(self, dest: UninitValue, ctx: &mut Context) -> Result<()> {
+    fn write(self, dest: UninitValue, ctx: &mut Context) {
         Value::write(self.inner, dest, ctx)
     }
 }
@@ -916,7 +914,7 @@ impl<const KEYS_ARE_ORDERED: bool, K: Keys, V: Values> Value
     }
 
     #[inline]
-    fn write(self, dest: UninitValue, ctx: &mut Context) -> Result<()> {
+    fn write(self, dest: UninitValue, ctx: &mut Context) {
         Attrset::write(self, dest, ctx)
     }
 }
@@ -966,7 +964,7 @@ where
     }
 
     #[inline]
-    fn write(self, dest: UninitValue, ctx: &mut Context) -> Result<()> {
+    fn write(self, dest: UninitValue, ctx: &mut Context) {
         Attrset::write(self, dest, ctx)
     }
 }
@@ -1034,7 +1032,7 @@ where
     }
 
     #[inline]
-    fn write(self, dest: UninitValue, ctx: &mut Context) -> Result<()> {
+    fn write(self, dest: UninitValue, ctx: &mut Context) {
         Attrset::write(self, dest, ctx)
     }
 }
@@ -1506,7 +1504,7 @@ where
     }
 
     #[inline]
-    fn write(self, dest: UninitValue, ctx: &mut Context) -> Result<()> {
+    fn write(self, dest: UninitValue, ctx: &mut Context) {
         Attrset::write(self, dest, ctx)
     }
 }
@@ -1674,7 +1672,7 @@ pub mod optional_fields {
         }
 
         #[inline]
-        fn write(self, dest: UninitValue, ctx: &mut Context) -> Result<()> {
+        fn write(self, dest: UninitValue, ctx: &mut Context) {
             Attrset::write(self, dest, ctx)
         }
     }

@@ -53,7 +53,7 @@ pub trait Thunk {
             }
 
             #[inline]
-            fn write(self, dest: UninitValue, ctx: &mut Context) -> Result<()> {
+            fn write(self, dest: UninitValue, ctx: &mut Context) {
                 Thunk::write(self.0, dest, ctx)
             }
         }
@@ -63,7 +63,7 @@ pub trait Thunk {
 
     #[doc(hidden)]
     #[inline]
-    fn write(self, dest: UninitValue, ctx: &mut Context) -> Result<()>
+    fn write(self, dest: UninitValue, ctx: &mut Context)
     where
         Self: Sized + 'static,
         Self::Output: IntoValue,
@@ -96,18 +96,15 @@ pub trait Thunk {
             //   only called once;
             let thunk = unsafe { Box::from_raw(userdata.cast::<Th>()) };
 
-            let result = thunk.force(&mut ctx).and_then(|output| {
-                output.into_value(&mut ctx).write(dest, &mut ctx)
-            });
-
-            if let Err(err) = result {
-                unsafe {
+            match thunk.force(&mut ctx) {
+                Ok(output) => output.into_value(&mut ctx).write(dest, &mut ctx),
+                Err(err) => unsafe {
                     nixb_sys::set_err_msg(
                         ctx_raw,
                         err.kind().code(),
                         err.message().as_ptr(),
                     );
-                }
+                },
             }
 
             mem::forget(ctx.into_inner());
@@ -143,8 +140,6 @@ pub trait Thunk {
         init_res.unwrap_or_else(|err| {
             panic!("failed to allocate Nix thunk: {err}")
         });
-
-        Ok(())
     }
 }
 
@@ -207,7 +202,7 @@ impl<Owner: ValueOwner> Value for NixThunk<Owner> {
     }
 
     #[inline]
-    fn write(self, dest: UninitValue, ctx: &mut Context) -> Result<()> {
+    fn write(self, dest: UninitValue, ctx: &mut Context) {
         self.value.write(dest, ctx)
     }
 }

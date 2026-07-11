@@ -11,7 +11,7 @@ use core::{fmt, slice};
 use nixb_error::{Error, Result};
 
 use crate::context::Context;
-use crate::error::{TryFromI64Error, TryIntoI64Error, TypeMismatchError};
+use crate::error::{TryFromI64Error, TypeMismatchError};
 use crate::list::{List, NixList};
 use crate::tuple::{RecursiveTuple, Tuple};
 
@@ -21,7 +21,7 @@ pub trait Value {
     fn kind(&self) -> ValueKind;
 
     /// Writes this value into the given destination.
-    fn write(self, dest: UninitValue, ctx: &mut Context) -> Result<()>;
+    fn write(self, dest: UninitValue, ctx: &mut Context);
 
     /// TODO: docs.
     #[inline(always)]
@@ -45,7 +45,7 @@ pub trait IntValue: Value + Sized {
     ///
     /// This method should only be called after a successful call to
     /// [`kind`](Value::kind) returns [`ValueKind::Int`].
-    unsafe fn into_int(self, ctx: &mut Context) -> Result<i64>;
+    unsafe fn into_int(self, ctx: &mut Context) -> i64;
 }
 
 /// TODO: docs.
@@ -320,7 +320,7 @@ impl Value for Null {
     }
 
     #[inline]
-    fn write(self, dest: UninitValue, _: &mut Context) -> Result<()> {
+    fn write(self, dest: UninitValue, _: &mut Context) {
         // `nix_init_null` errors when:
         //
         // 1. the destination pointer is null;
@@ -330,7 +330,6 @@ impl Value for Null {
         unsafe {
             nixb_sys::init_null(ptr::null_mut(), dest.as_ptr());
         }
-        Ok(())
     }
 }
 
@@ -378,7 +377,7 @@ impl<Owner: ValueOwner> Value for NixValue<Owner> {
     }
 
     #[inline]
-    fn write(self, dest: UninitValue, _: &mut Context) -> Result<()> {
+    fn write(self, dest: UninitValue, _: &mut Context) {
         // 'nix_copy_value' errors when:
         //
         // 1. the destination pointer is null;
@@ -391,7 +390,6 @@ impl<Owner: ValueOwner> Value for NixValue<Owner> {
         unsafe {
             nixb_sys::copy_value(ptr::null_mut(), dest.as_ptr(), self.as_ptr());
         };
-        Ok(())
     }
 }
 
@@ -404,8 +402,8 @@ impl<Owner: ValueOwner> BoolValue for NixValue<Owner> {
 
 impl<Owner: ValueOwner> IntValue for NixValue<Owner> {
     #[inline]
-    unsafe fn into_int(self, _: &mut Context) -> Result<i64> {
-        Ok(unsafe { nixb_sys::get_int(ptr::null_mut(), self.as_ptr()) })
+    unsafe fn into_int(self, _: &mut Context) -> i64 {
+        unsafe { nixb_sys::get_int(ptr::null_mut(), self.as_ptr()) }
     }
 }
 
@@ -528,7 +526,7 @@ impl Value for bool {
     }
 
     #[inline]
-    fn write(self, dest: UninitValue, _: &mut Context) -> Result<()> {
+    fn write(self, dest: UninitValue, _: &mut Context) {
         // `nix_init_bool` errors when:
         //
         // 1. the destination pointer is null;
@@ -538,7 +536,6 @@ impl Value for bool {
         unsafe {
             nixb_sys::init_bool(ptr::null_mut(), dest.as_ptr(), self);
         }
-        Ok(())
     }
 }
 
@@ -551,7 +548,7 @@ macro_rules! impl_value_for_int {
             }
 
             #[inline]
-            fn write(self, dest: UninitValue, _: &mut Context) -> Result<()> {
+            fn write(self, dest: UninitValue, _: &mut Context) {
                 // `nix_init_int` errors when:
                 //
                 // 1. the destination pointer is null;
@@ -566,14 +563,13 @@ macro_rules! impl_value_for_int {
                         self.into(),
                     );
                 }
-                Ok(())
             }
         }
 
         impl IntValue for $ty {
             #[inline]
-            unsafe fn into_int(self, _: &mut Context) -> Result<i64> {
-                Ok(self.into())
+            unsafe fn into_int(self, _: &mut Context) -> i64 {
+                self.into()
             }
         }
     };
@@ -596,16 +592,14 @@ macro_rules! impl_value_for_big_int {
             }
 
             #[inline]
-            fn write(self, dest: UninitValue, ctx: &mut Context) -> Result<()> {
-                unsafe { self.into_int(ctx)?.write(dest, ctx) }
-            }
-        }
-
-        impl IntValue for $ty {
-            #[inline]
-            unsafe fn into_int(self, _: &mut Context) -> Result<i64> {
-                self.try_into()
-                    .map_err(|_| TryIntoI64Error::<$ty>::new(self).into())
+            fn write(self, dest: UninitValue, ctx: &mut Context) {
+                match i64::try_from(self) {
+                    value => value.write(dest, ctx),
+                    _ => panic!(
+                        "{self}{} cannot be represented as a Nix integer",
+                        stringify!($ty),
+                    ),
+                }
             }
         }
     };
@@ -624,7 +618,7 @@ macro_rules! impl_value_for_float {
             }
 
             #[inline]
-            fn write(self, dest: UninitValue, _: &mut Context) -> Result<()> {
+            fn write(self, dest: UninitValue, _: &mut Context) {
                 // `nix_init_float` errors when:
                 //
                 // 1. the destination pointer is null;
@@ -639,7 +633,6 @@ macro_rules! impl_value_for_float {
                         self.into(),
                     );
                 }
-                Ok(())
             }
         }
     };
@@ -655,7 +648,7 @@ impl Value for &CStr {
     }
 
     #[inline]
-    fn write(self, dest: UninitValue, ctx: &mut Context) -> Result<()> {
+    fn write(self, dest: UninitValue, ctx: &mut Context) {
         // `nix_init_string` errors when:
         //
         // 1. the destination pointer is null;
@@ -668,8 +661,6 @@ impl Value for &CStr {
             nixb_sys::init_string(ctx, dest.as_ptr(), self.as_ptr());
         })
         .unwrap_or_else(|err| panic!("failed to allocate Nix string: {err}"));
-
-        Ok(())
     }
 }
 
@@ -680,7 +671,7 @@ impl Value for CString {
     }
 
     #[inline]
-    fn write(self, dest: UninitValue, ctx: &mut Context) -> Result<()> {
+    fn write(self, dest: UninitValue, ctx: &mut Context) {
         self.as_c_str().write(dest, ctx)
     }
 }
@@ -692,7 +683,7 @@ impl Value for &str {
     }
 
     #[inline(always)]
-    fn write(self, dest: UninitValue, ctx: &mut Context) -> Result<()> {
+    fn write(self, dest: UninitValue, ctx: &mut Context) {
         match CString::new(self) {
             Ok(c_str) => c_str.write(dest, ctx),
             Err(nul_err) => {
@@ -716,7 +707,7 @@ impl Value for alloc::string::String {
     }
 
     #[inline]
-    fn write(self, dest: UninitValue, ctx: &mut Context) -> Result<()> {
+    fn write(self, dest: UninitValue, ctx: &mut Context) {
         self.as_str().write(dest, ctx)
     }
 }
@@ -731,7 +722,7 @@ impl<T: Value> Value for Option<T> {
     }
 
     #[inline]
-    fn write(self, dest: UninitValue, ctx: &mut Context) -> Result<()> {
+    fn write(self, dest: UninitValue, ctx: &mut Context) {
         match self {
             Some(value) => value.write(dest, ctx),
             None => Null.write(dest, ctx),
@@ -753,7 +744,7 @@ where
     }
 
     #[inline]
-    fn write(self, dest: UninitValue, ctx: &mut Context) -> Result<()> {
+    fn write(self, dest: UninitValue, ctx: &mut Context) {
         match self {
             Self::Borrowed(value) => value.write(dest, ctx),
             Self::Owned(value) => value.write(dest, ctx),
@@ -768,7 +759,7 @@ impl<T: IntoValue> Value for Vec<T> {
     }
 
     #[inline]
-    fn write(self, dest: UninitValue, ctx: &mut Context) -> Result<()> {
+    fn write(self, dest: UninitValue, ctx: &mut Context) {
         List::write(self, dest, ctx)
     }
 }
@@ -780,7 +771,7 @@ impl<const N: usize, T: IntoValue> Value for [T; N] {
     }
 
     #[inline]
-    fn write(self, dest: UninitValue, ctx: &mut Context) -> Result<()> {
+    fn write(self, dest: UninitValue, ctx: &mut Context) {
         List::write(self, dest, ctx)
     }
 }
@@ -793,7 +784,7 @@ impl Value for &std::path::Path {
     }
 
     #[inline(always)]
-    fn write(self, dest: UninitValue, ctx: &mut Context) -> Result<()> {
+    fn write(self, dest: UninitValue, ctx: &mut Context) {
         let bytes = self.as_os_str().as_encoded_bytes();
 
         let c_string =
@@ -834,8 +825,6 @@ impl Value for &std::path::Path {
         .unwrap_or_else(|err| {
             panic!("failed to allocate or canonicalize Nix path: {err}")
         });
-
-        Ok(())
     }
 }
 
@@ -857,7 +846,7 @@ impl Value for std::path::PathBuf {
     }
 
     #[inline]
-    fn write(self, dest: UninitValue, ctx: &mut Context) -> Result<()> {
+    fn write(self, dest: UninitValue, ctx: &mut Context) {
         self.as_path().write(dest, ctx)
     }
 }
@@ -880,7 +869,7 @@ impl Value for compact_str::CompactString {
     }
 
     #[inline]
-    fn write(self, dest: UninitValue, ctx: &mut Context) -> Result<()> {
+    fn write(self, dest: UninitValue, ctx: &mut Context) {
         self.as_str().write(dest, ctx)
     }
 }
@@ -893,7 +882,7 @@ impl<T: IntoValue, const N: usize> Value for smallvec::SmallVec<[T; N]> {
     }
 
     #[inline]
-    fn write(self, dest: UninitValue, ctx: &mut Context) -> Result<()> {
+    fn write(self, dest: UninitValue, ctx: &mut Context) {
         List::write(self, dest, ctx)
     }
 }
@@ -909,7 +898,7 @@ impl<L: Value, R: Value> Value for either::Either<L, R> {
     }
 
     #[inline]
-    fn write(self, dest: UninitValue, ctx: &mut Context) -> Result<()> {
+    fn write(self, dest: UninitValue, ctx: &mut Context) {
         match self {
             Self::Left(left) => left.write(dest, ctx),
             Self::Right(right) => right.write(dest, ctx),
@@ -962,7 +951,7 @@ impl<V: IntValue> TryFromValue<V> for i64 {
 
         match value.kind() {
             // SAFETY: the value's kind is an integer.
-            ValueKind::Int => unsafe { value.into_int(ctx) },
+            ValueKind::Int => Ok(unsafe { value.into_int(ctx) }),
             other => Err(TypeMismatchError {
                 expected: ValueKind::Int,
                 found: other,

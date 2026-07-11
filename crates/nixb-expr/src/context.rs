@@ -101,22 +101,16 @@ impl<'eval> Context<'eval> {
 
     /// TODO: docs.
     #[inline]
-    pub fn new_value(&mut self, value: impl Value) -> Result<NixValue> {
+    pub fn new_value(&mut self, value: impl Value) -> NixValue {
         let dest = self.alloc_value();
 
-        if let Err(err) = value.write(dest, self) {
-            let _ = self.with_raw(|ctx| unsafe {
-                nixb_sys::value_decref(ctx, dest.as_ptr())
-            });
-
-            return Err(err);
-        }
+        value.write(dest, self);
 
         // SAFETY: `dest` points to an initialized Nix value, and this creates
         // the unique `Owned` handle responsible for releasing that value.
         let owner = unsafe { Owned::new(dest.as_non_null()) };
 
-        Ok(NixValue::new(owner))
+        NixValue::new(owner)
     }
 
     /// Allocates a new, uninitialized value, returning a pointer to it.
@@ -289,8 +283,8 @@ impl<'eval> AttrsetBuilder<'_, 'eval> {
     pub(crate) fn insert(
         &mut self,
         key: &CStr,
-        write_value: impl FnOnce(UninitValue, &mut Context) -> Result<()>,
-    ) -> Result<()> {
+        write_value: impl FnOnce(UninitValue, &mut Context),
+    ) {
         assert!(
             key.to_bytes().len() < u32::MAX as usize,
             "attribute name exceeds Nix's 4 GiB limit",
@@ -298,7 +292,7 @@ impl<'eval> AttrsetBuilder<'_, 'eval> {
 
         let dest = self.context.alloc_value();
 
-        write_value(dest, self.context)?;
+        write_value(dest, self.context);
 
         self.context
             .with_raw(|ctx| unsafe {
@@ -321,8 +315,6 @@ impl<'eval> AttrsetBuilder<'_, 'eval> {
             .unwrap_or_else(|err| {
                 panic!("failed to intern attribute name: {err}")
             });
-
-        Ok(())
     }
 }
 
@@ -353,10 +345,10 @@ impl<'eval> ListBuilder<'_, 'eval> {
     #[inline]
     pub(crate) fn insert(
         &mut self,
-        write_value: impl FnOnce(UninitValue, &mut Context) -> Result<()>,
-    ) -> Result<()> {
+        write_value: impl FnOnce(UninitValue, &mut Context),
+    ) {
         let dest = self.context.alloc_value();
-        write_value(dest, self.context)?;
+        write_value(dest, self.context);
 
         #[cfg(not(feature = "nix-2-34"))]
         unsafe {
@@ -381,7 +373,6 @@ impl<'eval> ListBuilder<'_, 'eval> {
         }
 
         self.index += 1;
-        Ok(())
     }
 }
 
