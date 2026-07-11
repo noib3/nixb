@@ -2,7 +2,7 @@ use std::collections::HashSet;
 use std::ffi::CString;
 
 use proc_macro2::{Ident, Literal, Span, TokenStream};
-use quote::{ToTokens, quote};
+use quote::quote;
 use syn::meta::ParseNestedMeta;
 use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
@@ -25,40 +25,36 @@ pub(crate) fn expand(input: DeriveInput) -> syn::Result<TokenStream> {
     let attrs = Attributes::parse(&input.attrs, AttributePosition::Struct)?;
     let fields = named_fields(&input)?;
 
-    let attrset = Ident::new("__attrset", Span::call_site());
-    let value = Ident::new("__value", Span::call_site());
+    let pattern_input = Ident::new("__input", Span::call_site());
     let ctx = Ident::new("__ctx", Span::call_site());
-    let lifetime: LifetimeParam = parse_quote!('a);
+    let (lifetime, lifetime_generic) = lifetime_generic(&input)?;
 
-    let try_from_attrset_impl =
-        try_from_attrset_impl(&attrs, fields, &attrset, &ctx)?;
-    let lifetime_generic = lifetime_generic(&input, &lifetime)?;
+    let pattern_impl =
+        match_pattern_impl(&attrs, fields, &pattern_input, &ctx, &lifetime)?;
+    let match_pattern_impl = &pattern_impl.match_pattern;
+    let formal_match_count_impl = &pattern_impl.formal_match_count;
+    let has_flattened_fields = pattern_impl.has_flattened;
     let struct_name = &input.ident;
+    let ellipsis = attrs.ellipsis;
 
     Ok(quote! {
-        impl<#lifetime> ::nixb::expr::value::TryFromValue<::nixb::expr::value::NixValue<::nixb::expr::value::Borrowed<#lifetime>>> for #struct_name #lifetime_generic {
-            #[inline]
-            fn try_from_value(
-                #value: ::nixb::expr::value::NixValue<::nixb::expr::value::Borrowed<#lifetime>>,
-                #ctx: &mut ::nixb::expr::context::Context,
-            ) -> ::nixb::Result<Self> {
-                let #attrset = ::nixb::expr::attrset::NixAttrset::<_>::try_from_value(
-                    #value, #ctx,
-                )?;
-                <Self as ::nixb::expr::value::TryFromValue<_>>::try_from_value(
-                    #attrset,
-                    #ctx,
-                )
-            }
-        }
+        impl<#lifetime> ::nixb::expr::set_pattern::SetPattern<#lifetime>
+            for #struct_name #lifetime_generic
+        {
+            const ELLIPSIS: bool = #ellipsis;
+            const HAS_FLATTENED_FIELDS: bool = #has_flattened_fields;
 
-        impl<#lifetime> ::nixb::expr::value::TryFromValue<::nixb::expr::attrset::NixAttrset<::nixb::expr::value::Borrowed<#lifetime>>> for #struct_name #lifetime_generic {
             #[inline]
-            fn try_from_value(
-                #attrset: ::nixb::expr::attrset::NixAttrset<::nixb::expr::value::Borrowed<#lifetime>>,
+            fn formal_match_count(__key: &::core::ffi::CStr) -> usize {
+                #formal_match_count_impl
+            }
+
+            #[inline]
+            fn match_pattern<const __CHECK_DUPLICATES: bool>(
+                #pattern_input: &mut ::nixb::expr::set_pattern::SetPatternInput<#lifetime, __CHECK_DUPLICATES>,
                 #ctx: &mut ::nixb::expr::context::Context,
             ) -> ::nixb::Result<Self> {
-                #try_from_attrset_impl
+                #match_pattern_impl
             }
         }
     })
@@ -66,22 +62,27 @@ pub(crate) fn expand(input: DeriveInput) -> syn::Result<TokenStream> {
 
 fn lifetime_generic(
     input: &DeriveInput,
-    lifetime: &LifetimeParam,
-) -> syn::Result<impl ToTokens> {
-    match input.generics.params.iter().fold(
-        (0, 0),
-        |(num_total, num_lifetimes), r#gen| {
-            let is_lifetime = matches!(r#gen, syn::GenericParam::Lifetime(_));
-            (num_total + 1, num_lifetimes + (is_lifetime as usize))
-        },
-    ) {
-        (0, 0) => Ok(None),
-        (1, 1) => Ok(Some(quote! { <#lifetime> })),
-        _ => Err(syn::Error::new(
-            input.generics.span(),
-            "Args can only have zero or one lifetime generic parameter",
-        )),
+) -> syn::Result<(LifetimeParam, Option<TokenStream>)> {
+    if input.generics.params.is_empty() {
+        return Ok((parse_quote!('__pattern), None));
     }
+
+    let Some(syn::GenericParam::Lifetime(lifetime)) =
+        input.generics.params.first()
+    else {
+        return Err(syn::Error::new(
+            input.generics.span(),
+            "set patterns can only have zero or one lifetime generic parameter",
+        ));
+    };
+    if input.generics.params.len() != 1 {
+        return Err(syn::Error::new(
+            input.generics.span(),
+            "set patterns can only have zero or one lifetime generic parameter",
+        ));
+    }
+
+    Ok((lifetime.clone(), Some(quote! { <#lifetime> })))
 }
 
 fn named_fields(input: &DeriveInput) -> syn::Result<&FieldsNamed> {
@@ -120,25 +121,60 @@ fn named_fields(input: &DeriveInput) -> syn::Result<&FieldsNamed> {
     }
 }
 
+struct PatternImpl {
+    match_pattern: TokenStream,
+    formal_match_count: TokenStream,
+    has_flattened: bool,
+}
+
 #[expect(clippy::too_many_lines)]
-fn try_from_attrset_impl(
+#[expect(clippy::too_many_arguments)]
+fn match_pattern_impl(
     struct_attrs: &Attributes,
     fields: &FieldsNamed,
-    attrset: &Ident,
+    input: &Ident,
     ctx: &Ident,
-) -> syn::Result<impl ToTokens> {
+    lifetime: &LifetimeParam,
+) -> syn::Result<PatternImpl> {
     let mut field_names = Punctuated::<_, Comma>::new();
     let mut field_initializers = TokenStream::new();
     let mut formal_match_arms = TokenStream::new();
+    let mut flattened_match_counts = TokenStream::new();
     let mut formal_names = HashSet::new();
-    let count_match =
-        (!struct_attrs.ellipsis).then(|| quote! { __num_matched += 1; });
+    let mut has_flattened = false;
 
     for field in fields.named.iter() {
         let field_attrs =
             Attributes::parse(&field.attrs, AttributePosition::Field)?;
 
         let field_name = field.ident.as_ref().expect("fields are named");
+        field_names.push(field_name);
+
+        if field_attrs.flatten {
+            has_flattened = true;
+            if field_attrs.rename.is_some()
+                || field_attrs.default.is_some()
+                || field_attrs.parse_with.is_some()
+            {
+                return Err(syn::Error::new(
+                    field.span(),
+                    "`flatten` cannot be combined with other attributes",
+                ));
+            }
+
+            let field_ty = &field.ty;
+            field_initializers.extend(quote! {
+                let #field_name =
+                    <#field_ty as ::nixb::expr::set_pattern::SetPattern<#lifetime>>::match_pattern::<__CHECK_DUPLICATES>(
+                        #input,
+                        #ctx,
+                    )?;
+            });
+            flattened_match_counts.extend(quote! {
+                + <#field_ty as ::nixb::expr::set_pattern::SetPattern<#lifetime>>::formal_match_count(__key)
+            });
+            continue;
+        }
 
         let mut key_name_str = field_name.to_string();
 
@@ -158,7 +194,7 @@ fn try_from_attrset_impl(
         }
 
         let key_bytes = Literal::byte_string(key_name_str.as_bytes());
-        formal_match_arms.extend(quote! { #key_bytes => true, });
+        formal_match_arms.extend(quote! { #key_bytes => 1, });
 
         let key_name = CString::new(key_name_str)
             .map_err(|err| {
@@ -168,8 +204,6 @@ fn try_from_attrset_impl(
                 )
             })
             .map(|name| Literal::c_string(&name))?;
-
-        field_names.push(field_name);
 
         let default_attr =
             field_attrs.default.as_ref().or(struct_attrs.default.as_ref());
@@ -194,11 +228,8 @@ fn try_from_attrset_impl(
         };
 
         let field_initializer = quote! {
-            let #field_name = match #attrset.get_opt(#key_name, #ctx)? {
-                Some(#value_ident) => {
-                    #count_match
-                    #value_expr
-                },
+            let #field_name = match #input.take(#key_name, #ctx)? {
+                Some(#value_ident) => #value_expr,
                 None => #default_expr,
             };
         };
@@ -206,53 +237,18 @@ fn try_from_attrset_impl(
         field_initializers.extend(field_initializer);
     }
 
-    let reject_extra_attrs = (!struct_attrs.ellipsis).then(|| {
-        quote! {
-            if #attrset.len(#ctx) != __num_matched {
-                let mut __unexpected_arg = ::core::option::Option::None;
-                ::nixb::expr::attrset::MergeableAttrset::for_each_key(
-                    &#attrset,
-                    |__key, _| {
-                        if __unexpected_arg.is_some() {
-                            return;
-                        }
-                        let __is_formal = match __key.to_bytes() {
-                            #formal_match_arms
-                            _ => false,
-                        };
-                        if !__is_formal {
-                            __unexpected_arg = ::core::option::Option::Some(
-                                ::nixb::Error::from_message(
-                                    ::core::format_args!(
-                                        "function called with unexpected argument '{}'",
-                                        __key.to_string_lossy(),
-                                    ),
-                                ),
-                            );
-                        }
-                    },
-                    #ctx,
-                );
-                let ::core::option::Option::Some(__unexpected_arg) =
-                    __unexpected_arg
-                else {
-                    ::core::unreachable!(
-                        "attribute count differs, so an unexpected argument exists",
-                    );
-                };
-                return ::core::result::Result::Err(__unexpected_arg);
-            }
-        }
-    });
-    let matched_count = (!struct_attrs.ellipsis).then(|| {
-        quote! { let mut __num_matched: ::core::ffi::c_uint = 0; }
-    });
-
-    Ok(quote! {
-        #matched_count
-        #field_initializers
-        #reject_extra_attrs
-        Ok(Self { #field_names })
+    Ok(PatternImpl {
+        match_pattern: quote! {
+            #field_initializers
+            Ok(Self { #field_names })
+        },
+        formal_match_count: quote! {
+            (match __key.to_bytes() {
+                #formal_match_arms
+                _ => 0,
+            }) #flattened_match_counts
+        },
+        has_flattened,
     })
 }
 
@@ -261,6 +257,7 @@ struct Attributes {
     rename: Option<Rename>,
     default: Option<DefaultAttr>,
     parse_with: Option<Expr>,
+    flatten: bool,
     ellipsis: bool,
 }
 
@@ -350,6 +347,18 @@ impl Attributes {
                                 "`ellipsis` attribute is only allowed on \
                                  structs",
                             ));
+                        },
+                    }
+                } else if meta.path.is_ident("flatten") {
+                    match pos {
+                        AttributePosition::Struct => {
+                            return Err(meta.error(
+                                "`flatten` attribute is only allowed on \
+                                 struct fields",
+                            ));
+                        },
+                        AttributePosition::Field => {
+                            this.flatten = true;
                         },
                     }
                 } else {

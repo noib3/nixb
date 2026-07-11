@@ -15,6 +15,8 @@ pub mod function;
 mod into_result;
 pub mod list;
 mod never;
+#[doc(hidden)]
+pub mod set_pattern;
 pub mod thunk;
 pub mod tuple;
 mod utf8_cstr;
