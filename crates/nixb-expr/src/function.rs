@@ -218,8 +218,31 @@ pub trait Function {
 
         let args_arity = self.args_arity();
         let args_names = self.args_names();
+
+        assert!(
+            args_arity != 0,
+            "zero-arity Function impls must come from the 'Function for \
+             IntoValue' blanket impl, which only there to allow implementing \
+             PrimOps on those values",
+        );
+        debug_assert!(
+            args_arity <= 8,
+            "all the Args impls in this crate have at most 8 arguments",
+        );
+
         let userdata = self.into_userdata();
 
+        // `init_function` errors when:
+        //
+        // 1. the function name pointer is null;
+        // 2. the arity is zero or greater than eight;
+        // 3. the argument names array is null;
+        // 4. an argument name pointer is null;
+        // 5. interning the names or constructing the function fails to
+        //    allocate or exceeds an internal capacity.
+        //
+        // A Rust `str` guards against 1), the assertions above guard against
+        // 2), 3), and 4), while 5) is an allocation failure which we panic on.
         let init_res = ctx.with_raw_and_state(|ctx, state| unsafe {
             nixb_cpp::init_function(
                 ctx,
@@ -239,7 +262,11 @@ pub trait Function {
             Self::on_drop()(userdata);
         }
 
-        init_res
+        init_res.unwrap_or_else(|err| {
+            panic!("failed to allocate Nix function: {err}")
+        });
+
+        Ok(())
     }
 }
 

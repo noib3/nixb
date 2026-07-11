@@ -121,16 +121,30 @@ pub trait Thunk {
             let _: Box<Th> = unsafe { Box::from_raw(userdata.cast::<Th>()) };
         }
 
-        ctx.with_raw_and_state(|ctx, state| unsafe {
+        let userdata = Box::into_raw(Box::new(self)).cast();
+
+        let init_res = ctx.with_raw_and_state(|ctx, state| unsafe {
             nixb_cpp::init_thunk(
                 ctx,
                 state.as_ptr(),
                 dest.as_ptr(),
-                Box::into_raw(Box::new(self)).cast(),
+                userdata,
                 on_force::<Self>,
                 on_drop::<Self>,
             );
-        })
+        });
+
+        if init_res.is_err() {
+            // SAFETY: initialization failed, so C++ did not take ownership of
+            // the pointer produced by `Box::into_raw`.
+            unsafe { on_drop::<Self>(userdata) };
+        }
+
+        init_res.unwrap_or_else(|err| {
+            panic!("failed to allocate Nix thunk: {err}")
+        });
+
+        Ok(())
     }
 }
 

@@ -412,7 +412,7 @@ extern "C" nix_err init_thunk(nix_c_context *context,
   if (context)
     context->last_err_code = NIX_OK;
 
-  // Only mkThunk can throw, so we keep the try block minimal
+  // Only allocating ExprRustCallback can throw; mkThunk is noexcept.
   try {
     auto *expr = new ExprRustCallback(userdata, on_force_once, on_drop);
 #ifdef NIX_2_34
