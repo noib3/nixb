@@ -28,10 +28,12 @@ const MACRO_NAME: &str = "Attrset";
 pub(crate) fn expand(input: DeriveInput) -> syn::Result<TokenStream> {
     let attrs = Attributes::parse(&input.attrs, AttributePosition::Struct)?;
 
+    let struct_name = &input.ident;
+
     let mut fields = named_fields(&input)?
         .named
         .iter()
-        .map(|field| Field::new(field, &attrs))
+        .map(|field| Field::new(field, &attrs, struct_name))
         .collect::<syn::Result<Vec<_>>>()?;
 
     // Sort the fields by key so that the generated attrset is ordered.
@@ -77,7 +79,7 @@ pub(crate) fn expand(input: DeriveInput) -> syn::Result<TokenStream> {
     let keys = fields
         .iter()
         .map(|field| Literal::c_string(&field.field_key_as_c_string));
-    let values = fields.iter().map(|field| &field.value_expr);
+
     let is_present = fields.iter().map(|field| match &field.should_skip_expr {
         Some(_) => {
             let skip_var = &field.skip_var_name;
@@ -89,9 +91,73 @@ pub(crate) fn expand(input: DeriveInput) -> syn::Result<TokenStream> {
     let num_non_skippable_fields =
         fields.iter().filter(|f| f.should_skip_expr.is_none()).count();
 
+    let into_value_wrappers = fields
+        .iter()
+        .map(|field| field.into_value_adapter.clone())
+        .collect::<Vec<_>>();
+
+    let key_types = fields
+        .iter()
+        .map(|_| quote! { &'static ::core::ffi::CStr })
+        .collect::<Vec<_>>();
+
+    let value_types = fields
+        .iter()
+        .zip(&into_value_wrappers)
+        .map(|(field, wrapper)| {
+            let field_ty = &field.field_ty;
+            match wrapper {
+                Some(wrapper) => quote! {
+                    #wrapper<#struct_name #ty_generics, #field_ty>
+                },
+                None => quote! { #field_ty },
+            }
+        })
+        .collect::<Vec<_>>();
+
+    let tuple = |items: &[_]| match items {
+        [item] => quote! { #item },
+        _ => quote! { (#(#items),*) },
+    };
+    let key_tuple_type = tuple(&key_types);
+    let value_tuple_type = tuple(&value_types);
+    let static_attrset_type = if num_non_skippable_fields == fields.len() {
+        quote! {
+            ::nixb::expr::attrset::StaticAttrset<
+                true,
+                #key_tuple_type,
+                #value_tuple_type,
+            >
+        }
+    } else {
+        let num_fields = Literal::usize_unsuffixed(fields.len());
+        quote! {
+            ::nixb::expr::attrset::StaticAttrsetWithOptionalFields<
+                true,
+                #key_tuple_type,
+                #value_tuple_type,
+                #num_fields,
+            >
+        }
+    };
+
+    let values =
+        fields.iter().zip(&into_value_wrappers).map(|(field, wrapper)| {
+            let value_expr = &field.value_expr;
+            match wrapper {
+                Some(wrapper) => quote! {
+                    #wrapper {
+                        field: #value_expr,
+                        _owner: ::core::marker::PhantomData,
+                    }
+                },
+                None => quote! { #value_expr },
+            }
+        });
+
     let into_static_attrset_body = if num_non_skippable_fields == fields.len() {
         quote! {
-            ::nixb::expr::attrset::StaticAttrset::<true, _, _>::new(
+            ::nixb::expr::attrset::StaticAttrset::new(
                 (#(#keys),*),
                 (#(#values),*),
             )
@@ -122,7 +188,7 @@ pub(crate) fn expand(input: DeriveInput) -> syn::Result<TokenStream> {
             #(#skip_var_declarations)*
             let mut __len: ::core::ffi::c_uint = #num_non_skippable;
             #(#len_increments)*
-            ::nixb::expr::attrset::StaticAttrsetWithOptionalFields::<true, _, _, _>::new(
+            ::nixb::expr::attrset::StaticAttrsetWithOptionalFields::new(
                 (#(#keys),*),
                 (#(#values),*),
                 [#(#is_present),*],
@@ -151,22 +217,78 @@ pub(crate) fn expand(input: DeriveInput) -> syn::Result<TokenStream> {
         }
     });
 
-    let struct_name = &input.ident;
+    let into_value_wrapper_impls = fields
+        .iter()
+        .zip(&into_value_wrappers)
+        .filter_map(|(field, wrapper)| {
+            let visibility = &input.vis;
+            let wrapper = wrapper.as_ref()?;
+            let field_ty = &field.field_ty;
+            let expr = field.into_value_expr.as_ref().expect("wrapper exists");
+            let use_params = use_params.clone();
+
+            Some(quote! {
+                #[doc(hidden)]
+                #[allow(non_camel_case_types)]
+                #visibility struct #wrapper<__Owner, __Field> {
+                    field: __Field,
+                    _owner: ::core::marker::PhantomData<fn() -> __Owner>,
+                }
+
+                impl #impl_generics ::nixb::expr::value::IntoValue
+                    for #wrapper<#struct_name #ty_generics, #field_ty>
+                    #extended_where_clause
+                {
+                    #[inline]
+                    fn into_value<#eval_lifetime>(
+                        self,
+                        #ctx: &mut ::nixb::expr::context::Context<#eval_lifetime>,
+                    ) -> impl ::nixb::expr::value::Value + use<#(#use_params),*> {
+                        // This helper lets closures infer the field's type.
+                        #[inline(always)]
+                        fn __call<T, R>(f: impl FnOnce(T) -> R, value: T) -> R {
+                            f(value)
+                        }
+
+                        ::nixb::expr::value::IntoValue::into_value(
+                            __call(#expr, self.field),
+                            #ctx,
+                        )
+                    }
+                }
+            })
+        });
+
+    let rename_self = (num_non_skippable_fields < fields.len())
+        .then(|| quote! { let __value = self; });
 
     Ok(quote! {
+        #(#into_value_wrapper_impls)*
+
+        impl #impl_generics ::core::convert::From<#struct_name #ty_generics>
+            for #static_attrset_type
+            #extended_where_clause
+        {
+            #[inline]
+            fn from(__value: #struct_name #ty_generics) -> Self {
+                #into_static_attrset_body
+            }
+        }
+
         impl #impl_generics ::nixb::expr::attrset::Attrset for #struct_name #ty_generics #extended_where_clause {
             #[inline]
             fn into_attrset_iter<#eval_lifetime>(
                 self,
                 #ctx: &mut ::nixb::expr::context::Context<#eval_lifetime>,
             ) -> impl ::nixb::expr::attrset::AttrsetIterator + use<#(#use_params),*> {
-                #into_static_attrset_body.into_attrset_iter(#ctx)
+                <#static_attrset_type>::from(self).into_attrset_iter(#ctx)
             }
         }
 
         impl #impl_generics ::nixb::expr::attrset::MergeableAttrset for #struct_name #ty_generics #extended_where_clause {
             #[inline]
             fn contains_key(&self, __key: &::core::ffi::CStr, _: &mut ::nixb::expr::context::Context) -> bool {
+                #rename_self
                 match __key.to_bytes() {
                     #(#contains_key_match_arms)*
                     _ => false,
@@ -179,6 +301,7 @@ pub(crate) fn expand(input: DeriveInput) -> syn::Result<TokenStream> {
                 mut __fun: impl FnMut(&::core::ffi::CStr, &mut ::nixb::expr::context::Context<#eval_lifetime>),
                 #ctx: &mut ::nixb::expr::context::Context<#eval_lifetime>,
             ) {
+                #rename_self
                 #(#for_each_key_stmts)*
             }
         }
@@ -246,10 +369,13 @@ struct Attributes {
 }
 
 struct Field {
+    field_ty: syn::Type,
     field_key_as_c_string: CString,
     field_key: String,
     should_skip_expr: Option<TokenStream>,
     skip_var_name: Ident,
+    into_value_adapter: Option<Ident>,
+    into_value_expr: Option<Expr>,
     value_expr: TokenStream,
 }
 
@@ -332,7 +458,11 @@ impl Attributes {
 }
 
 impl Field {
-    fn new(field: &syn::Field, struct_attrs: &Attributes) -> syn::Result<Self> {
+    fn new(
+        field: &syn::Field,
+        struct_attrs: &Attributes,
+        struct_name: &Ident,
+    ) -> syn::Result<Self> {
         let field_attrs =
             Attributes::parse(&field.attrs, AttributePosition::Field)?;
 
@@ -367,29 +497,27 @@ impl Field {
             .skip_if
             .as_ref()
             .or(struct_attrs.skip_if.as_ref())
-            .cloned()
-            .map(|expr| quote! { (#expr)(&self.#field_ident) });
+            .cloned();
+
+        let should_skip_expr = should_skip_expr
+            .map(|expr| quote! { (#expr)(&__value.#field_ident) });
 
         let skip_var_name = format_ident!("__should_skip_{field_ident}");
-
-        let value_expr = match field_attrs.into_value {
-            // The `__call` function is needed to avoid type-inference issues.
-            // Without it, the compiler requires the user to spell out the
-            // field's type if using a closure as the expression.
-            Some(expr) => quote! {{
-                #[inline(always)]
-                fn __call<T, R>(f: impl FnOnce(T) -> R, v: T) -> R { f(v) }
-                let __field = self.#field_ident;
-                ::nixb::expr::value::IntoValueFn::new(move |__ctx| __call(#expr, __field))
-            }},
-            None => quote! { self.#field_ident },
-        };
+        let field_name = field_ident.to_string();
+        let field_name = field_name.strip_prefix("r#").unwrap_or(&field_name);
+        let into_value_adapter = field_attrs.into_value.as_ref().map(|_| {
+            format_ident!("__{struct_name}{field_name}IntoValueAdapter")
+        });
+        let value_expr = quote! { __value.#field_ident };
 
         Ok(Self {
+            field_ty: field.ty.clone(),
             field_key,
             field_key_as_c_string,
             should_skip_expr,
             skip_var_name,
+            into_value_adapter,
+            into_value_expr: field_attrs.into_value,
             value_expr,
         })
     }

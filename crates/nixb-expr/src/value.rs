@@ -594,7 +594,7 @@ macro_rules! impl_value_for_big_int {
             #[inline]
             fn write(self, dest: UninitValue, ctx: &mut Context) {
                 match i64::try_from(self) {
-                    value => value.write(dest, ctx),
+                    Ok(value) => value.write(dest, ctx),
                     _ => panic!(
                         "{self}{} cannot be represented as a Nix integer",
                         stringify!($ty),
