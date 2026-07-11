@@ -18,7 +18,7 @@ use syn::{
     WherePredicate,
 };
 
-use crate::try_from_value::{AttributePosition, Rename};
+use crate::set_pattern::{AttributePosition, Rename};
 
 const MACRO_NAME: &str = "Attrset";
 

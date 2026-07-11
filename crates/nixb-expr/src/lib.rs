@@ -22,5 +22,5 @@ pub mod value;
 
 pub use into_result::IntoResult;
 pub use never::Never;
-pub use nixb_macros::{Attrset, TryFromValue, Value};
+pub use nixb_macros::{Attrset, SetPattern, Value};
 pub use utf8_cstr::Utf8CStr;

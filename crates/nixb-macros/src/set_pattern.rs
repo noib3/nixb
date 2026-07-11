@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::ffi::CString;
 
 use proc_macro2::{Ident, Literal, Span, TokenStream};
@@ -17,7 +18,7 @@ use syn::{
     parse_quote,
 };
 
-const MACRO_NAME: &str = "TryFromValue";
+const MACRO_NAME: &str = "SetPattern";
 
 #[inline]
 pub(crate) fn expand(input: DeriveInput) -> syn::Result<TokenStream> {
@@ -44,6 +45,19 @@ pub(crate) fn expand(input: DeriveInput) -> syn::Result<TokenStream> {
                 let #attrset = ::nixb::expr::attrset::NixAttrset::<_>::try_from_value(
                     #value, #ctx,
                 )?;
+                <Self as ::nixb::expr::value::TryFromValue<_>>::try_from_value(
+                    #attrset,
+                    #ctx,
+                )
+            }
+        }
+
+        impl<#lifetime> ::nixb::expr::value::TryFromValue<::nixb::expr::attrset::NixAttrset<::nixb::expr::value::Borrowed<#lifetime>>> for #struct_name #lifetime_generic {
+            #[inline]
+            fn try_from_value(
+                #attrset: ::nixb::expr::attrset::NixAttrset<::nixb::expr::value::Borrowed<#lifetime>>,
+                #ctx: &mut ::nixb::expr::context::Context,
+            ) -> ::nixb::Result<Self> {
                 #try_from_attrset_impl
             }
         }
@@ -106,6 +120,7 @@ fn named_fields(input: &DeriveInput) -> syn::Result<&FieldsNamed> {
     }
 }
 
+#[expect(clippy::too_many_lines)]
 fn try_from_attrset_impl(
     struct_attrs: &Attributes,
     fields: &FieldsNamed,
@@ -114,6 +129,10 @@ fn try_from_attrset_impl(
 ) -> syn::Result<impl ToTokens> {
     let mut field_names = Punctuated::<_, Comma>::new();
     let mut field_initializers = TokenStream::new();
+    let mut formal_match_arms = TokenStream::new();
+    let mut formal_names = HashSet::new();
+    let count_match =
+        (!struct_attrs.ellipsis).then(|| quote! { __num_matched += 1; });
 
     for field in fields.named.iter() {
         let field_attrs =
@@ -128,6 +147,18 @@ fn try_from_attrset_impl(
         {
             rename.clone().apply(&mut key_name_str);
         }
+
+        if !formal_names.insert(key_name_str.clone()) {
+            return Err(syn::Error::new(
+                field.span(),
+                format_args!(
+                    "duplicate formal function argument {key_name_str:?}",
+                ),
+            ));
+        }
+
+        let key_bytes = Literal::byte_string(key_name_str.as_bytes());
+        formal_match_arms.extend(quote! { #key_bytes => true, });
 
         let key_name = CString::new(key_name_str)
             .map_err(|err| {
@@ -145,8 +176,8 @@ fn try_from_attrset_impl(
 
         let value_ident = Ident::new("__value", Span::call_site());
 
-        let value_expr = match field_attrs.with {
-            Some(with_expr) => quote!((#with_expr)(#value_ident, #ctx)?),
+        let value_expr = match field_attrs.parse_with {
+            Some(parse_with) => quote!((#parse_with)(#value_ident, #ctx)?),
             None => quote!(#value_ident),
         };
 
@@ -164,7 +195,10 @@ fn try_from_attrset_impl(
 
         let field_initializer = quote! {
             let #field_name = match #attrset.get_opt(#key_name, #ctx)? {
-                Some(#value_ident) => #value_expr,
+                Some(#value_ident) => {
+                    #count_match
+                    #value_expr
+                },
                 None => #default_expr,
             };
         };
@@ -172,8 +206,52 @@ fn try_from_attrset_impl(
         field_initializers.extend(field_initializer);
     }
 
+    let reject_extra_attrs = (!struct_attrs.ellipsis).then(|| {
+        quote! {
+            if #attrset.len(#ctx) != __num_matched {
+                let mut __unexpected_arg = ::core::option::Option::None;
+                ::nixb::expr::attrset::MergeableAttrset::for_each_key(
+                    &#attrset,
+                    |__key, _| {
+                        if __unexpected_arg.is_some() {
+                            return;
+                        }
+                        let __is_formal = match __key.to_bytes() {
+                            #formal_match_arms
+                            _ => false,
+                        };
+                        if !__is_formal {
+                            __unexpected_arg = ::core::option::Option::Some(
+                                ::nixb::Error::from_message(
+                                    ::core::format_args!(
+                                        "function called with unexpected argument '{}'",
+                                        __key.to_string_lossy(),
+                                    ),
+                                ),
+                            );
+                        }
+                    },
+                    #ctx,
+                );
+                let ::core::option::Option::Some(__unexpected_arg) =
+                    __unexpected_arg
+                else {
+                    ::core::unreachable!(
+                        "attribute count differs, so an unexpected argument exists",
+                    );
+                };
+                return ::core::result::Result::Err(__unexpected_arg);
+            }
+        }
+    });
+    let matched_count = (!struct_attrs.ellipsis).then(|| {
+        quote! { let mut __num_matched: ::core::ffi::c_uint = 0; }
+    });
+
     Ok(quote! {
+        #matched_count
         #field_initializers
+        #reject_extra_attrs
         Ok(Self { #field_names })
     })
 }
@@ -182,7 +260,8 @@ fn try_from_attrset_impl(
 struct Attributes {
     rename: Option<Rename>,
     default: Option<DefaultAttr>,
-    with: Option<Expr>,
+    parse_with: Option<Expr>,
+    ellipsis: bool,
 }
 
 #[derive(Clone)]
@@ -206,11 +285,12 @@ pub(crate) enum Rename {
 }
 
 impl Attributes {
+    #[expect(clippy::too_many_lines)]
     fn parse(attrs: &[Attribute], pos: AttributePosition) -> syn::Result<Self> {
         let mut this = Self::default();
 
         for attr in attrs {
-            if !attr.path().is_ident("try_from") {
+            if !attr.path().is_ident("pattern") {
                 continue;
             }
 
@@ -248,16 +328,28 @@ impl Attributes {
                     } else {
                         this.default = Some(DefaultAttr::Default);
                     }
-                } else if meta.path.is_ident("with") {
+                } else if meta.path.is_ident("parse_with") {
                     match pos {
                         AttributePosition::Struct => {
                             return Err(meta.error(
-                                "`with` attribute is only allowed on struct \
-                                 fields",
+                                "`parse_with` attribute is only allowed on \
+                                 struct fields",
                             ));
                         },
                         AttributePosition::Field => {
-                            this.with = Some(meta.value()?.parse()?);
+                            this.parse_with = Some(meta.value()?.parse()?);
+                        },
+                    }
+                } else if meta.path.is_ident("ellipsis") {
+                    match pos {
+                        AttributePosition::Struct => {
+                            this.ellipsis = true;
+                        },
+                        AttributePosition::Field => {
+                            return Err(meta.error(
+                                "`ellipsis` attribute is only allowed on \
+                                 structs",
+                            ));
                         },
                     }
                 } else {

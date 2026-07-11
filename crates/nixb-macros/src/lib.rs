@@ -5,7 +5,7 @@ mod attrset_derive;
 mod list;
 mod plugin_entry;
 mod primop;
-mod try_from_value;
+mod set_pattern;
 mod value;
 
 use proc_macro::TokenStream;
@@ -53,10 +53,10 @@ pub fn primop(input: TokenStream) -> TokenStream {
 }
 
 /// TODO: docs
-#[proc_macro_derive(TryFromValue, attributes(try_from))]
-pub fn try_from_value(input: TokenStream) -> TokenStream {
+#[proc_macro_derive(SetPattern, attributes(pattern))]
+pub fn set_pattern(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as syn::DeriveInput);
-    try_from_value::expand(input)
+    set_pattern::expand(input)
         .unwrap_or_else(syn::Error::into_compile_error)
         .into()
 }
