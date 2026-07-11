@@ -259,17 +259,30 @@ impl<'eval> EvalState<'eval> {
 
 impl<'eval> AttrsetBuilder<'_, 'eval> {
     #[inline]
-    pub(crate) fn build(self, dest: UninitValue) -> Result<()> {
+    pub(crate) fn build(self, dest: UninitValue) {
         #[cfg(not(feature = "nix-2-34"))]
         unsafe {
             nixb_cpp::make_attrs(dest.as_ptr(), self.inner.as_ptr());
             Ok(())
         }
 
+        // `nix_make_attrs` errors when:
+        //
+        // 1. the destination pointer is null;
+        // 2. the destination value is already initialized;
+        // 3. sorting the bindings throws an exception.
+        //
+        // Having an `UninitValue` guards against 1) and 2). The builder's
+        // bindings contain trivially movable `Attr`s whose comparison only
+        // compares `Symbol`s, which is `noexcept`, so 3) cannot happen.
         #[cfg(feature = "nix-2-34")]
-        self.context.with_raw(|ctx| unsafe {
-            nixb_sys::make_attrs(ctx, dest.as_ptr(), self.inner.as_ptr());
-        })
+        unsafe {
+            nixb_sys::make_attrs(
+                core::ptr::null_mut(),
+                dest.as_ptr(),
+                self.inner.as_ptr(),
+            );
+        }
     }
 
     #[inline]
@@ -307,17 +320,27 @@ impl<'eval> AttrsetBuilder<'_, 'eval> {
 
 impl<'eval> ListBuilder<'_, 'eval> {
     #[inline]
-    pub(crate) fn build(self, dest: UninitValue) -> Result<()> {
+    pub(crate) fn build(self, dest: UninitValue) {
         #[cfg(not(feature = "nix-2-34"))]
         unsafe {
             nixb_cpp::make_list(dest.as_ptr(), self.inner.as_ptr());
             Ok(())
         }
 
+        // `nix_make_list` errors when:
+        //
+        // 1. the destination pointer is null;
+        // 2. the destination value is already initialized.
+        //
+        // Having an `UninitValue` guards against both, so neither can happen.
         #[cfg(feature = "nix-2-34")]
-        self.context.with_raw(|ctx| unsafe {
-            nixb_sys::make_list(ctx, self.inner.as_ptr(), dest.as_ptr());
-        })
+        unsafe {
+            nixb_sys::make_list(
+                core::ptr::null_mut(),
+                self.inner.as_ptr(),
+                dest.as_ptr(),
+            );
+        }
     }
 
     #[inline]

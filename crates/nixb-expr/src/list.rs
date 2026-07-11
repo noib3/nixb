@@ -84,7 +84,8 @@ pub trait List {
                 builder.insert(|dest, ctx| value.write(dest, ctx))?;
 
                 if rest.is_exhausted() {
-                    builder.build(self.dest)
+                    builder.build(self.dest);
+                    Ok(())
                 } else {
                     rest.with_next(self, builder)
                 }
@@ -94,7 +95,8 @@ pub trait List {
         let iter = self.into_list_iter(ctx);
         let builder = ctx.make_list_builder(iter.len());
         if iter.is_exhausted() {
-            builder.build(dest)
+            builder.build(dest);
+            Ok(())
         } else {
             iter.with_next(WriteNext { dest }, builder)
         }

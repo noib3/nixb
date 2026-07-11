@@ -104,7 +104,8 @@ pub trait Attrset {
                 })?;
 
                 if rest.is_exhausted() {
-                    builder.build(self.dest)
+                    builder.build(self.dest);
+                    Ok(())
                 } else {
                     rest.with_next(self, builder)
                 }
@@ -114,7 +115,8 @@ pub trait Attrset {
         let iter = self.into_attrset_iter(ctx);
         let builder = ctx.make_attrset_builder(iter.len());
         if iter.is_exhausted() {
-            builder.build(dest)
+            builder.build(dest);
+            Ok(())
         } else {
             iter.with_next(WriteNext { dest }, builder)
         }
