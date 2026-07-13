@@ -170,18 +170,10 @@ pub trait Key: fmt::Debug {
 
 /// TODO: docs.
 pub trait Keys:
-    Tuple<
-        First: Key,
-        Last: Key,
-        FromFirst = <Self as Keys>::FromFirst,
-        UpToLast = <Self as Keys>::UpToLast,
-    >
+    Tuple<First: Key, FromFirst = <Self as Keys>::FromFirst>
 {
     /// TODO: docs.
     type FromFirst: Keys;
-
-    /// TODO: docs.
-    type UpToLast: Keys;
 
     /// Calls the given closure for each key in the tuple.
     ///
@@ -1511,22 +1503,18 @@ where
 
 impl Keys for () {
     type FromFirst = Self;
-    type UpToLast = Self;
 }
 
 impl<T> Keys for [T; 0] {
     type FromFirst = Self;
-    type UpToLast = Self;
 }
 
 impl<T> Keys for T
 where
-    T: RecursiveTuple<First: Key, Last: Key>,
+    T: RecursiveTuple<First: Key>,
     <T as Tuple>::FromFirst: Keys,
-    <T as Tuple>::UpToLast: Keys,
 {
     type FromFirst = <T as Tuple>::FromFirst;
-    type UpToLast = <T as Tuple>::UpToLast;
 }
 
 #[doc(hidden)]

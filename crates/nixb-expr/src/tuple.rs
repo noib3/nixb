@@ -7,14 +7,8 @@ pub trait Tuple {
     /// The type of the first element of the tuple.
     type First;
 
-    /// The type of the last element of the tuple.
-    type Last;
-
     /// The type of the tuple without the first element.
     type FromFirst;
-
-    /// The type of the tuple without the last element.
-    type UpToLast;
 
     /// TODO: docs.
     type Borrow<'a>: Tuple
@@ -34,13 +28,6 @@ pub trait Tuple {
     /// Implementors are expected to panic if the tuple is empty.
     fn split_first(self) -> (Self::First, Self::FromFirst);
 
-    /// Splits the tuple into its last element and the rest.
-    ///
-    /// # Panics
-    ///
-    /// Implementors are expected to panic if the tuple is empty.
-    fn split_last(self) -> (Self::UpToLast, Self::Last);
-
     /// Returns whether the tuple is empty (i.e., its [length](Tuple::len) is
     /// zero).
     #[inline]
@@ -50,13 +37,11 @@ pub trait Tuple {
 }
 
 /// A non-empty tuple.
-pub trait RecursiveTuple: Tuple<FromFirst: Tuple, UpToLast: Tuple> {}
+pub trait RecursiveTuple: Tuple<FromFirst: Tuple> {}
 
 impl Tuple for () {
     type First = Never;
-    type Last = Never;
     type FromFirst = Self;
-    type UpToLast = Self;
     type Borrow<'a> = Self;
 
     #[inline]
@@ -71,17 +56,11 @@ impl Tuple for () {
     fn split_first(self) -> (Self::First, Self::FromFirst) {
         panic!("Cannot split first element from an empty tuple")
     }
-    #[cold]
-    fn split_last(self) -> (Self::UpToLast, Self::Last) {
-        panic!("Cannot split last element from an empty tuple")
-    }
 }
 
 impl<T> Tuple for (T,) {
     type First = T;
-    type Last = T;
     type FromFirst = ();
-    type UpToLast = ();
     type Borrow<'a>
         = (&'a T,)
     where
@@ -100,19 +79,13 @@ impl<T> Tuple for (T,) {
     fn split_first(self) -> (Self::First, Self::FromFirst) {
         (self.0, ())
     }
-    #[inline]
-    fn split_last(self) -> (Self::UpToLast, Self::Last) {
-        ((), self.0)
-    }
 }
 
 impl<T> RecursiveTuple for (T,) {}
 
 impl<T> Tuple for [T; 0] {
     type First = Never;
-    type Last = Never;
     type FromFirst = Self;
-    type UpToLast = Self;
     type Borrow<'a>
         = [&'a T; 0]
     where
@@ -131,17 +104,11 @@ impl<T> Tuple for [T; 0] {
     fn split_first(self) -> (Self::First, Self::FromFirst) {
         panic!("Cannot split first element from an empty array")
     }
-    #[inline]
-    fn split_last(self) -> (Self::UpToLast, Self::Last) {
-        panic!("Cannot split last element from an empty array")
-    }
 }
 
 impl<T> Tuple for [T; 1] {
     type First = T;
-    type Last = T;
     type FromFirst = ();
-    type UpToLast = ();
     type Borrow<'a>
         = [&'a T; 1]
     where
@@ -161,11 +128,6 @@ impl<T> Tuple for [T; 1] {
     fn split_first(self) -> (Self::First, Self::FromFirst) {
         let [first] = self;
         (first, ())
-    }
-    #[inline]
-    fn split_last(self) -> (Self::UpToLast, Self::Last) {
-        let [last] = self;
-        ((), last)
     }
 }
 
@@ -194,9 +156,7 @@ macro_rules! impl_tuple_for_tuple {
     (@final [($first_idx:tt $first_T:ident) $(($mid_idx:tt $mid_T:ident))* [$last_idx:tt $last_T:ident]]) => {
         impl<$first_T, $($mid_T,)* $last_T> Tuple for ($first_T, $($mid_T,)* $last_T,) {
             type First = $first_T;
-            type Last = $last_T;
             type FromFirst = ($($mid_T,)* $last_T,);
-            type UpToLast = ($first_T, $($mid_T,)*);
             type Borrow<'a>
                 = (&'a $first_T, $(&'a $mid_T,)* &'a $last_T,)
             where
@@ -219,10 +179,6 @@ macro_rules! impl_tuple_for_tuple {
                 (self.$first_idx, ($(self.$mid_idx,)* self.$last_idx,))
             }
 
-            #[inline]
-            fn split_last(self) -> (Self::UpToLast, Self::Last) {
-                ((self.$first_idx, $(self.$mid_idx,)*), self.$last_idx)
-            }
         }
 
         impl<$first_T, $($mid_T,)* $last_T> RecursiveTuple
@@ -321,9 +277,7 @@ macro_rules! impl_tuple_for_array {
     ($n:literal) => {
         impl<T> Tuple for [T; $n] {
             type First = T;
-            type Last = T;
             type FromFirst = [T; $n - 1];
-            type UpToLast = [T; $n - 1];
             type Borrow<'a>
                 = [&'a T; $n]
             where
@@ -348,17 +302,6 @@ macro_rules! impl_tuple_for_array {
                         arr.as_ptr().add(1).cast::<[T; $n - 1]>(),
                     );
                     (first, rest)
-                }
-            }
-
-            #[inline]
-            fn split_last(self) -> (Self::UpToLast, Self::Last) {
-                unsafe {
-                    let arr = core::mem::ManuallyDrop::new(self);
-                    let init =
-                        core::ptr::read(arr.as_ptr().cast::<[T; $n - 1]>());
-                    let last = core::ptr::read(arr.as_ptr().add($n - 1));
-                    (init, last)
                 }
             }
         }

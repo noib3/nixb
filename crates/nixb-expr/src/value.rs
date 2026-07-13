@@ -89,18 +89,10 @@ pub trait TryFromValue<V: Value>: Sized {
 
 /// TODO: docs.
 pub trait Values:
-    Tuple<
-        First: IntoValue,
-        Last: IntoValue,
-        FromFirst = <Self as Values>::FromFirst,
-        UpToLast = <Self as Values>::UpToLast,
-    >
+    Tuple<First: IntoValue, FromFirst = <Self as Values>::FromFirst>
 {
     /// TODO: docs.
     type FromFirst: Values;
-
-    /// TODO: docs.
-    type UpToLast: Values;
 }
 
 /// TODO: docs.
@@ -1161,20 +1153,16 @@ impl<Owner: ValueOwner> TryFromValue<NixValue<Owner>>
 
 impl Values for () {
     type FromFirst = Self;
-    type UpToLast = Self;
 }
 
 impl<T> Values for [T; 0] {
     type FromFirst = Self;
-    type UpToLast = Self;
 }
 
 impl<T> Values for T
 where
-    T: RecursiveTuple<First: IntoValue, Last: IntoValue>,
+    T: RecursiveTuple<First: IntoValue>,
     <T as Tuple>::FromFirst: Values,
-    <T as Tuple>::UpToLast: Values,
 {
     type FromFirst = <T as Tuple>::FromFirst;
-    type UpToLast = <T as Tuple>::UpToLast;
 }
