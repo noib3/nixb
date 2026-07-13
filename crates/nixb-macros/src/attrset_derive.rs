@@ -499,8 +499,17 @@ impl Field {
             .or(struct_attrs.skip_if.as_ref())
             .cloned();
 
-        let should_skip_expr = should_skip_expr
-            .map(|expr| quote! { (#expr)(&__value.#field_ident) });
+        let should_skip_expr = should_skip_expr.map(|expr| {
+            quote! {{
+                // This helper lets closures infer the field's type.
+                #[inline(always)]
+                fn __call<T>(f: impl FnOnce(T) -> bool, value: T) -> bool {
+                    f(value)
+                }
+
+                __call(#expr, &__value.#field_ident)
+            }}
+        });
 
         let skip_var_name = format_ident!("__should_skip_{field_ident}");
         let field_name = field_ident.to_string();
