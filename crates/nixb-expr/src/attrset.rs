@@ -10,8 +10,7 @@ use core::ffi::{CStr, c_uint};
 use core::marker::PhantomData;
 use core::ops::Deref;
 use core::ptr::{self, NonNull};
-use core::result::Result as CoreResult;
-use core::{fmt, mem};
+use core::{fmt, mem, result};
 
 use nixb_error::{Error, ErrorKind, Result};
 pub use nixb_macros::attrset;
@@ -428,53 +427,54 @@ impl<Owner: ValueOwner> NixAttrset<Owner> {
         on_key_missing: impl FnOnce(&CStr) -> Err,
         on_get_error: impl FnOnce(&CStr, Error) -> Err,
         ctx: &mut Context,
-    ) -> CoreResult<NixValue<Owner::Borrow<'this>>, Err> {
-        fn get_attrs<'a, OnKeyMissing, Err>(
+    ) -> result::Result<NixValue<Owner::Borrow<'this>>, Err> {
+        fn get_value<'a, OnKeyMissing, Err>(
             attrs: NixAttrset<Borrowed<'a>>,
+            num_keys: usize,
             keys: impl Keys,
             on_key_missing: OnKeyMissing,
             on_get_error: impl FnOnce(&CStr, Error) -> Err,
             ctx: &mut Context,
-        ) -> CoreResult<(NixAttrset<Borrowed<'a>>, OnKeyMissing), Err>
+        ) -> result::Result<NixValue<Borrowed<'a>>, Err>
         where
             OnKeyMissing: FnOnce(&CStr) -> Err,
         {
-            if keys.is_empty() {
-                Ok((attrs, on_key_missing))
-            } else {
-                let (key, rest) = keys.split_first();
-                let res = key.with_cstr(|key| attrs.get_opt(key, ctx));
-                match res {
-                    Ok(Some(next_attrs)) => get_attrs(
-                        next_attrs,
-                        rest,
-                        on_key_missing,
-                        on_get_error,
-                        ctx,
-                    ),
-                    Ok(None) => Err(key.with_cstr(on_key_missing)),
-                    Err(err) => {
-                        Err(key.with_cstr(|key| on_get_error(key, err)))
-                    },
-                }
+            debug_assert_eq!(keys.len(), num_keys);
+
+            let (key, rest) = keys.split_first();
+
+            if num_keys == 1 {
+                let Some(value) =
+                    key.with_cstr(|key| attrs.get_value(key, ctx))
+                else {
+                    return Err(key.with_cstr(on_key_missing));
+                };
+                return Ok(value);
+            }
+
+            let res = key.with_cstr(|key| attrs.get_opt(key, ctx));
+            match res {
+                Ok(Some(next_attrs)) => get_value(
+                    next_attrs,
+                    num_keys - 1,
+                    rest,
+                    on_key_missing,
+                    on_get_error,
+                    ctx,
+                ),
+                Ok(None) => Err(key.with_cstr(on_key_missing)),
+                Err(err) => Err(key.with_cstr(|key| on_get_error(key, err))),
             }
         }
 
-        let (up_to_last, last) = keys.split_last();
-
-        let (attrs, on_key_missing) = get_attrs(
+        let val = get_value(
             self.as_borrowed(),
-            up_to_last,
+            keys.len(),
+            keys,
             on_key_missing,
             on_get_error,
             ctx,
         )?;
-
-        let Some(val): Option<NixValue<Borrowed<'this>>> =
-            last.with_cstr(|key| attrs.get_value(key, ctx))
-        else {
-            return Err(last.with_cstr(on_key_missing));
-        };
 
         let val_ptr = val.owner().value_ptr();
 
