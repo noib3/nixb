@@ -2,7 +2,6 @@
 
 #![cfg_attr(not(feature = "std"), no_std)]
 #![cfg_attr(nightly, feature(const_type_name))]
-#![cfg_attr(nightly, feature(generic_const_exprs))]
 
 extern crate alloc;
 

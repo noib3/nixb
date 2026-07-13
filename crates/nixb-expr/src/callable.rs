@@ -1,5 +1,8 @@
 //! TODO: docs.
 
+use alloc::boxed::Box;
+use core::ffi::c_void;
+use core::mem::ManuallyDrop;
 use core::ptr;
 
 use nixb_error::Result;
@@ -27,42 +30,35 @@ pub trait Callable {
 
     /// TODO: docs.
     #[inline]
-    fn call(&self, arg: impl IntoValue, ctx: &mut Context) -> Result<NixThunk> {
+    fn call(&self, arg: impl IntoValue, ctx: &mut Context) -> NixThunk {
+        let function_ptr = self.value_ptr();
+        assert!(!function_ptr.is_null(), "Callable::value_ptr() returned null");
+
         let dest_val = ctx.alloc_value();
         let arg_val = ctx.alloc_value();
 
         arg.into_value(ctx).write(arg_val, ctx);
 
-        let res = ctx.with_raw(|ctx| {
-            unsafe {
-                nixb_sys::init_apply(
-                    ctx,
-                    dest_val.as_ptr(),
-                    self.value_ptr(),
-                    arg_val.as_ptr(),
-                )
-            };
-        });
+        // `nix_init_apply` errors only when one of its pointers is null, and
+        // `UninitValue` together with the assertion above guard against that.
+        unsafe {
+            nixb_sys::init_apply(
+                ptr::null_mut(),
+                dest_val.as_ptr(),
+                function_ptr,
+                arg_val.as_ptr(),
+            );
+        }
 
         // Free the argument once we're done with it.
-        ctx.with_raw(|ctx| unsafe {
+        let _ = ctx.with_raw(|ctx| unsafe {
             nixb_sys::value_decref(ctx, arg_val.as_ptr())
-        })
-        .ok();
-
-        // Free the destination value if the call failed.
-        if let Err(err) = res {
-            ctx.with_raw(|ctx| unsafe {
-                nixb_sys::value_decref(ctx, dest_val.as_ptr())
-            })
-            .ok();
-            return Err(err);
-        }
+        });
 
         // SAFETY: `init_apply` has initialized the value at `dest_ptr`.
         let owner = unsafe { Owned::new(dest_val.as_non_null()) };
 
-        Ok(NixValue::new(owner).into())
+        NixValue::new(owner).into()
     }
 
     /// TODO: docs.
@@ -77,100 +73,208 @@ pub trait Callable {
         &self,
         args: Args,
         ctx: &mut Context,
-    ) -> Result<NixThunk> {
-        assert!(
-            Args::LEN >= 2,
-            "Callable::call_multi() requires at least 2 arguments"
-        );
+    ) -> NixThunk {
+        struct CallMultiUserdata(Box<[*mut nixb_sys::Value]>);
 
-        #[cfg(nightly)]
-        fn new_args_array<V: Values>(
-            _: &V,
-        ) -> impl AsMut<[*mut nixb_sys::Value]> + use<V> {
-            core::array::from_fn::<_, { V::LEN }, _>(|_| ptr::null_mut())
+        impl CallMultiUserdata {
+            #[inline]
+            fn args_mut(&mut self) -> &mut [*mut nixb_sys::Value] {
+                &mut self.0[2..]
+            }
+
+            #[inline]
+            unsafe fn from_userdata(userdata: *mut c_void) -> Self {
+                let values = userdata.cast::<*mut nixb_sys::Value>();
+                // SAFETY: `userdata` points to the allocation created by
+                // `into_ptr`, whose first word stores the argument count.
+                let num_args = unsafe { (*values).addr() };
+                let values =
+                    ptr::slice_from_raw_parts_mut(values, num_args + 2);
+                // SAFETY: the slice metadata was recovered from the first
+                // word, recreating the original Box allocation.
+                Self(unsafe { Box::from_raw(values) })
+            }
+
+            #[inline]
+            fn function_ptr(&self) -> *mut nixb_sys::Value {
+                self.0[1]
+            }
+
+            #[inline]
+            fn into_ptr(self) -> *mut c_void {
+                let this = ManuallyDrop::new(self);
+                // SAFETY: `this` will not be dropped, and this moves its Box
+                // into the raw allocation managed by the thunk callbacks.
+                let values = unsafe { ptr::read(&this.0) };
+                Box::into_raw(values).cast::<*mut nixb_sys::Value>().cast()
+            }
+
+            #[inline]
+            fn new(
+                callable: &(impl Callable + ?Sized),
+                args: impl Values,
+                num_args: usize,
+                ctx: &mut Context,
+            ) -> Self {
+                fn write_args<Args: Values>(
+                    args: Args,
+                    args_buf: &mut [*mut nixb_sys::Value],
+                    num_allocated: &mut usize,
+                    ctx: &mut Context,
+                ) {
+                    let Some((arg_ptr, rest_args_buf)) =
+                        args_buf.split_first_mut()
+                    else {
+                        debug_assert!(args.is_empty());
+                        return;
+                    };
+                    let (first_arg, rest_args) = args.split_first();
+                    let dest = ctx.alloc_value();
+                    *arg_ptr = dest.as_ptr();
+                    *num_allocated += 1;
+                    first_arg.into_value(ctx).write(dest, ctx);
+                    write_args(rest_args, rest_args_buf, num_allocated, ctx);
+                }
+
+                debug_assert_eq!(args.len(), num_args);
+
+                let mut values = {
+                    let mut ptr_slice = Box::new_uninit_slice(num_args + 2);
+                    for ptr in &mut ptr_slice {
+                        ptr.write(ptr::null_mut());
+                    }
+                    // SAFETY: every slot was just initialized to null.
+                    unsafe { ptr_slice.assume_init() }
+                };
+
+                values[0] = ptr::without_provenance_mut(0);
+
+                values[1] = {
+                    let function_ptr = callable.value_ptr();
+                    assert!(
+                        !function_ptr.is_null(),
+                        "Callable::value_ptr() returned null"
+                    );
+                    ctx.with_raw(|ctx| unsafe {
+                        nixb_sys::value_incref(ctx, function_ptr);
+                    })
+                    .unwrap_or_else(|err| {
+                        panic!("failed to retain Nix function: {err}")
+                    });
+                    function_ptr
+                };
+
+                // Construct the owner before initializing any arguments so
+                // its Drop impl cleans up the function and every allocated
+                // argument in case we panic mid-initialization.
+                let mut this = Self(values);
+
+                let (num_allocated, values) =
+                    this.0.split_first_mut().expect("never empty");
+                // SAFETY: `usize` and a thin raw pointer have the same size
+                // and alignment. This header word is accessed exclusively as
+                // a `usize` for the duration of this mutable borrow.
+                let num_allocated = unsafe {
+                    &mut *ptr::from_mut(num_allocated).cast::<usize>()
+                };
+                write_args(args, &mut values[1..], num_allocated, ctx);
+                debug_assert_eq!(*num_allocated, num_args);
+                this
+            }
         }
 
-        #[cfg(not(nightly))]
-        fn new_args_array<V: Values>(
-            _: &V,
-        ) -> impl AsMut<[*mut nixb_sys::Value]> + use<V> {
-            (0..V::LEN).map(|_| ptr::null_mut()).collect::<alloc::vec::Vec<_>>()
+        impl Drop for CallMultiUserdata {
+            #[inline]
+            fn drop(&mut self) {
+                let num_allocated = (self.0[0]).addr();
+                for &value in &self.0[1..num_allocated + 2] {
+                    unsafe { nixb_sys::value_decref(ptr::null_mut(), value) };
+                }
+            }
         }
 
-        fn init_args_array<Args: Values>(
-            args: Args,
-            slice: &mut [*mut nixb_sys::Value],
-            num_written: &mut usize,
-            ctx: &mut Context,
+        unsafe extern "C" fn on_force(
+            ctx: *mut nixb_sys::c_context,
+            state: *mut nixb_sys::EvalState,
+            dest: *mut nixb_sys::Value,
+            userdata: *mut c_void,
         ) {
-            debug_assert_eq!(Args::LEN, slice.len());
-            let Some((first_ptr, rest_slice)) = slice.split_first_mut() else {
-                return;
-            };
-            let (first_arg, rest_args) = args.split_first();
-            let dest = ctx.alloc_value();
-            first_arg.into_value(ctx).write(dest, ctx);
-            *first_ptr = dest.as_ptr();
-            *num_written += 1;
-            init_args_array(rest_args, rest_slice, num_written, ctx)
-        }
+            // SAFETY:
+            // - `userdata` was created by `CallMultiUserdata::into_ptr`;
+            // - `init_thunk` calls this callback at most once.
+            let mut call =
+                unsafe { CallMultiUserdata::from_userdata(userdata) };
+            let function = call.function_ptr();
+            let args = call.args_mut();
 
-        // We'll do an eager call with the first N - 1 arguments, followed by
-        // a lazy call with the last argument.
-        let (args, last) = args.split_last();
-
-        let mut args_array = new_args_array(&args);
-        let mut num_written = 0;
-
-        let args_slice = &mut args_array.as_mut()[..];
-
-        let dest = ctx.alloc_value();
-
-        init_args_array(args, args_slice, &mut num_written, ctx);
-
-        let res = {
-            ctx.with_raw_and_state(|ctx, state| unsafe {
+            unsafe {
                 #[cfg(not(feature = "nix-2-34"))]
                 nixb_cpp::value_call_multi(
                     ctx,
-                    state.as_ptr(),
-                    self.value_ptr(),
-                    args_slice.len(),
-                    args_slice.as_mut_ptr(),
-                    dest.as_ptr(),
+                    state,
+                    function,
+                    args.len(),
+                    args.as_mut_ptr(),
+                    dest,
                 );
 
                 #[cfg(feature = "nix-2-34")]
                 nixb_sys::value_call_multi(
                     ctx,
-                    state.as_ptr(),
-                    self.value_ptr(),
-                    args_slice.len(),
-                    args_slice.as_mut_ptr(),
-                    dest.as_ptr(),
+                    state,
+                    function,
+                    args.len(),
+                    args.as_mut_ptr(),
+                    dest,
                 );
-            })
-        };
-
-        // Free the arguments once we're done with them.
-        for &raw_arg in &args_slice[..num_written] {
-            ctx.with_raw(|ctx| unsafe { nixb_sys::value_decref(ctx, raw_arg) })
-                .ok();
+            }
         }
 
-        // Free the destination value if the call failed.
-        if let Err(err) = res {
-            ctx.with_raw(|ctx| unsafe {
+        unsafe extern "C" fn on_drop(userdata: *mut c_void) {
+            // SAFETY:
+            // - `userdata` was created by `CallMultiUserdata::into_ptr`;
+            // - `init_thunk` calls this callback only when the force callback
+            //   is not called.
+            let _: CallMultiUserdata =
+                unsafe { CallMultiUserdata::from_userdata(userdata) };
+        }
+
+        let num_args = args.len();
+
+        assert!(
+            num_args >= 2,
+            "Callable::call_multi() requires at least 2 arguments"
+        );
+
+        let userdata = CallMultiUserdata::new(self, args, num_args, ctx);
+        let dest = ctx.alloc_value();
+        let userdata_ptr = userdata.into_ptr();
+
+        let init_res = ctx.with_raw_and_state(|ctx, state| unsafe {
+            nixb_cpp::init_thunk(
+                ctx,
+                state.as_ptr(),
+                dest.as_ptr(),
+                userdata_ptr,
+                on_force,
+                on_drop,
+            );
+        });
+
+        if let Err(err) = init_res {
+            // SAFETY: initialization failed, so C++ did not take ownership of
+            // `userdata`.
+            unsafe { on_drop(userdata_ptr) };
+            let _ = ctx.with_raw(|ctx| unsafe {
                 nixb_sys::value_decref(ctx, dest.as_ptr())
-            })
-            .ok();
-            return Err(err);
+            });
+            panic!("failed to allocate Nix thunk: {err}")
         }
 
-        // SAFETY: `value_call_multi` has initialized the value at `dest_ptr`.
+        // SAFETY: `init_thunk` has initialized the value at `dest`.
         let owner = unsafe { Owned::new(dest.as_non_null()) };
 
-        NixLambda::try_from_value(NixValue::new(owner), ctx)?.call(last, ctx)
+        NixValue::new(owner).into()
     }
 }
 

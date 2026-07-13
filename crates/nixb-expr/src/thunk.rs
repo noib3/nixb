@@ -131,15 +131,12 @@ pub trait Thunk {
             );
         });
 
-        if init_res.is_err() {
+        if let Err(err) = init_res {
             // SAFETY: initialization failed, so C++ did not take ownership of
             // the pointer produced by `Box::into_raw`.
             unsafe { on_drop::<Self>(userdata) };
+            panic!("failed to allocate Nix thunk: {err}");
         }
-
-        init_res.unwrap_or_else(|err| {
-            panic!("failed to allocate Nix thunk: {err}")
-        });
     }
 }
 

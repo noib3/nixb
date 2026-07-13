@@ -4,9 +4,6 @@ use crate::Never;
 
 /// TODO: docs.
 pub trait Tuple {
-    /// The number of elements in the tuple.
-    const LEN: usize;
-
     /// The type of the first element of the tuple.
     type First;
 
@@ -27,6 +24,9 @@ pub trait Tuple {
     /// Returns a new [`Tuple`] that refers to the elements of this tuple.
     fn borrow(&self) -> Self::Borrow<'_>;
 
+    /// The number of elements in the tuple.
+    fn len(&self) -> usize;
+
     /// Splits the tuple into its first element and the rest.
     ///
     /// # Panics
@@ -41,11 +41,11 @@ pub trait Tuple {
     /// Implementors are expected to panic if the tuple is empty.
     fn split_last(self) -> (Self::UpToLast, Self::Last);
 
-    /// Returns whether the tuple is empty (i.e., its [length](Tuple::LEN) is
+    /// Returns whether the tuple is empty (i.e., its [length](Tuple::len) is
     /// zero).
     #[inline]
     fn is_empty(&self) -> bool {
-        Self::LEN == 0
+        self.len() == 0
     }
 }
 
@@ -53,12 +53,16 @@ pub trait Tuple {
 pub trait RecursiveTuple: Tuple<FromFirst: Tuple, UpToLast: Tuple> {}
 
 impl Tuple for () {
-    const LEN: usize = 0;
     type First = Never;
     type Last = Never;
     type FromFirst = Self;
     type UpToLast = Self;
     type Borrow<'a> = Self;
+
+    #[inline]
+    fn len(&self) -> usize {
+        0
+    }
 
     #[inline]
     fn borrow(&self) -> Self {}
@@ -74,7 +78,6 @@ impl Tuple for () {
 }
 
 impl<T> Tuple for (T,) {
-    const LEN: usize = 1;
     type First = T;
     type Last = T;
     type FromFirst = ();
@@ -83,6 +86,11 @@ impl<T> Tuple for (T,) {
         = (&'a T,)
     where
         T: 'a;
+
+    #[inline]
+    fn len(&self) -> usize {
+        1
+    }
 
     #[inline]
     fn borrow(&self) -> Self::Borrow<'_> {
@@ -101,7 +109,6 @@ impl<T> Tuple for (T,) {
 impl<T> RecursiveTuple for (T,) {}
 
 impl<T> Tuple for [T; 0] {
-    const LEN: usize = 0;
     type First = Never;
     type Last = Never;
     type FromFirst = Self;
@@ -110,6 +117,11 @@ impl<T> Tuple for [T; 0] {
         = [&'a T; 0]
     where
         T: 'a;
+
+    #[inline]
+    fn len(&self) -> usize {
+        0
+    }
 
     #[inline]
     fn borrow(&self) -> Self::Borrow<'_> {
@@ -126,7 +138,6 @@ impl<T> Tuple for [T; 0] {
 }
 
 impl<T> Tuple for [T; 1] {
-    const LEN: usize = 1;
     type First = T;
     type Last = T;
     type FromFirst = ();
@@ -135,6 +146,11 @@ impl<T> Tuple for [T; 1] {
         = [&'a T; 1]
     where
         T: 'a;
+
+    #[inline]
+    fn len(&self) -> usize {
+        1
+    }
 
     #[inline]
     fn borrow(&self) -> Self::Borrow<'_> {
@@ -177,7 +193,6 @@ macro_rules! impl_tuple_for_tuple {
 
     (@final [($first_idx:tt $first_T:ident) $(($mid_idx:tt $mid_T:ident))* [$last_idx:tt $last_T:ident]]) => {
         impl<$first_T, $($mid_T,)* $last_T> Tuple for ($first_T, $($mid_T,)* $last_T,) {
-            const LEN: usize = 2 + count!($($mid_T)*);
             type First = $first_T;
             type Last = $last_T;
             type FromFirst = ($($mid_T,)* $last_T,);
@@ -188,6 +203,11 @@ macro_rules! impl_tuple_for_tuple {
                 $first_T: 'a,
                 $($mid_T: 'a,)*
                 $last_T: 'a;
+
+            #[inline]
+            fn len(&self) -> usize {
+                2 + count!($($mid_T)*)
+            }
 
             #[inline]
             fn borrow(&self) -> Self::Borrow<'_> {
@@ -300,8 +320,6 @@ impl_tuple_for_tuple!(
 macro_rules! impl_tuple_for_array {
     ($n:literal) => {
         impl<T> Tuple for [T; $n] {
-            const LEN: usize = $n;
-
             type First = T;
             type Last = T;
             type FromFirst = [T; $n - 1];
@@ -310,6 +328,11 @@ macro_rules! impl_tuple_for_array {
                 = [&'a T; $n]
             where
                 T: 'a;
+
+            #[inline]
+            fn len(&self) -> usize {
+                $n
+            }
 
             #[inline]
             fn borrow(&self) -> Self::Borrow<'_> {

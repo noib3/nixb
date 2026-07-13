@@ -538,7 +538,7 @@ impl<Owner: ValueOwner> NixDerivation<Owner> {
     {
         self.inner
             .get::<NixLambda<_>>(c"overrideAttrs", ctx)?
-            .call(function::<NixAttrset<Borrowed<'a>>>(fun), ctx)?
+            .call(function::<NixAttrset<Borrowed<'a>>>(fun), ctx)
             .force_into(ctx)
     }
 
@@ -560,7 +560,7 @@ impl<Owner: ValueOwner> NixDerivation<Owner> {
     pub fn realise(&self, ctx: &mut Context) -> Result<()> {
         let value = ctx
             .eval::<NixLambda>(c"drv: \"${drv}\"")?
-            .call(self.inner.borrow(), ctx)?
+            .call(self.inner.borrow(), ctx)
             .into_inner();
 
         let realised_str = ctx.with_raw_and_state(|ctx, state| unsafe {
@@ -1205,8 +1205,8 @@ impl Key for str {
 impl<K: Keys, V: Values> AttrsetIterator for StaticAttrsetIterator<K, V> {
     #[inline]
     fn len(&self) -> c_uint {
-        debug_assert_eq!(K::LEN, V::LEN);
-        K::LEN as c_uint
+        debug_assert_eq!(self.keys.len(), self.values.len());
+        self.keys.len() as c_uint
     }
 
     #[inline]

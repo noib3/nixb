@@ -445,7 +445,7 @@ where
 impl<V: Values> ListIterator for StaticList<V> {
     #[inline]
     fn len(&self) -> c_uint {
-        V::LEN as c_uint
+        self.values.len() as c_uint
     }
 
     #[inline]
