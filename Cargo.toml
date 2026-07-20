@@ -11,7 +11,7 @@ license = "MIT"
 [workspace.dependencies]
 # Third-party dependencies.
 cc = "1"
-compact_str = "0.9"
+compact_str = "0.10"
 either = { version = "1", default-features = false }
 libc = { version = "0.2", default-features = false }
 libloading = "0.9"
@@ -19,7 +19,6 @@ memchr = "2"
 pkg-config = "0.3"
 proc-macro2 = "1"
 quote = "1"
-rusqlite = { version = "0.38", features = ["bundled"] }
 smallvec = "1"
 syn = "2"
 

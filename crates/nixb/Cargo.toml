@@ -6,7 +6,7 @@ authors.workspace = true
 license.workspace = true
 
 [features]
-default = ["dlopen", "nix-2-34"]
+default = ["nix-2-34"]
 
 # Nix versions.
 nix-2-33 = [
@@ -34,7 +34,6 @@ store = ["nixb-store"]
 
 # Passthrough features.
 compact_str = ["nixb-expr?/compact_str"]
-dlopen = ["nixb-plugin?/dlopen"]
 either = ["nixb-expr?/either"]
 smallvec = ["nixb-expr?/smallvec"]
 std = ["nixb-expr?/std"]

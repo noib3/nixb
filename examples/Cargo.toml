@@ -7,8 +7,7 @@ authors.workspace = true
 license.workspace = true
 
 [features]
-default = ["dlopen", "nix-2-34"]
-dlopen = ["nixb/dlopen"]
+default = ["nix-2-34"]
 nix-2-33 = ["nixb/nix-2-33"]
 nix-2-34 = ["nixb/nix-2-34"]
 nix-2-35 = ["nixb/nix-2-35"]

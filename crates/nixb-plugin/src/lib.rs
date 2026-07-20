@@ -4,8 +4,6 @@
 
 extern crate alloc;
 
-#[cfg(feature = "dlopen")]
-mod dlopen;
 mod entrypoint;
 mod plugin;
 pub mod primop;
