@@ -732,6 +732,13 @@ impl<Owner: ValueOwner> From<NixDerivation<Owner>> for NixAttrset<Owner> {
     }
 }
 
+impl<Owner: ValueOwner> From<NixDerivation<Owner>> for NixValue<Owner> {
+    #[inline]
+    fn from(derivation: NixDerivation<Owner>) -> Self {
+        derivation.inner.into()
+    }
+}
+
 impl<Owner: ValueOwner> From<NixAttrset<Owner>> for NixValue<Owner> {
     #[inline]
     fn from(attrset: NixAttrset<Owner>) -> Self {
