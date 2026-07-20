@@ -380,6 +380,13 @@ impl<Owner: ValueOwner> From<NixFunctor<Owner>> for NixAttrset<Owner> {
     }
 }
 
+impl<Owner: ValueOwner> From<NixFunctor<Owner>> for NixValue<Owner> {
+    #[inline]
+    fn from(functor: NixFunctor<Owner>) -> Self {
+        functor.inner.into()
+    }
+}
+
 impl<Owner: ValueOwner> Callable for NixLambda<Owner> {
     #[inline]
     fn value_ptr(&self) -> *mut nixb_sys::Value {
