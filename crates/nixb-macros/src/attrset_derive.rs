@@ -361,7 +361,7 @@ fn named_fields(input: &DeriveInput) -> syn::Result<&FieldsNamed> {
     }
 }
 
-#[derive(Clone, Default)]
+#[derive(Default)]
 struct Attributes {
     rename: Option<Rename>,
     skip: Option<Skip>,
@@ -369,7 +369,6 @@ struct Attributes {
     bounds: Vec<WherePredicate>,
 }
 
-#[derive(Clone)]
 enum Skip {
     Always,
     IfExprTrue(Expr),
