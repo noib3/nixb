@@ -33,7 +33,7 @@ pub(crate) fn expand(input: DeriveInput) -> syn::Result<TokenStream> {
     let mut fields = named_fields(&input)?
         .named
         .iter()
-        .map(|field| Field::new(field, &attrs, struct_name))
+        .filter_map(|field| Field::new(field, &attrs, struct_name).transpose())
         .collect::<syn::Result<Vec<_>>>()?;
 
     // Sort the fields by key so that the generated attrset is ordered.
@@ -261,6 +261,7 @@ pub(crate) fn expand(input: DeriveInput) -> syn::Result<TokenStream> {
 
     let rename_self = (num_non_skippable_fields < fields.len())
         .then(|| quote! { let __value = self; });
+    let fun_mutability = (!fields.is_empty()).then(|| quote! { mut });
 
     Ok(quote! {
         #(#into_value_wrapper_impls)*
@@ -298,7 +299,7 @@ pub(crate) fn expand(input: DeriveInput) -> syn::Result<TokenStream> {
             #[inline]
             fn for_each_key<#eval_lifetime>(
                 &self,
-                mut __fun: impl FnMut(&::core::ffi::CStr, &mut ::nixb::expr::context::Context<#eval_lifetime>),
+                #fun_mutability __fun: impl FnMut(&::core::ffi::CStr, &mut ::nixb::expr::context::Context<#eval_lifetime>),
                 #ctx: &mut ::nixb::expr::context::Context<#eval_lifetime>,
             ) {
                 #rename_self
@@ -363,9 +364,15 @@ fn named_fields(input: &DeriveInput) -> syn::Result<&FieldsNamed> {
 #[derive(Clone, Default)]
 struct Attributes {
     rename: Option<Rename>,
-    skip_if: Option<Expr>,
+    skip: Option<Skip>,
     into_value: Option<Expr>,
     bounds: Vec<WherePredicate>,
+}
+
+#[derive(Clone)]
+enum Skip {
+    Always,
+    IfExprTrue(Expr),
 }
 
 struct Field {
@@ -414,8 +421,43 @@ impl Attributes {
                             this.rename = Some(Rename::parse(meta, pos)?);
                         },
                     }
+                } else if meta.path.is_ident("skip") {
+                    match pos {
+                        AttributePosition::Struct => {
+                            return Err(meta.error(
+                                "`skip` attribute is only allowed on struct \
+                                 fields",
+                            ));
+                        },
+                        AttributePosition::Field => {
+                            if matches!(this.skip, Some(Skip::IfExprTrue(_))) {
+                                return Err(meta.error(
+                                    "`skip` and `skip_if` cannot be used \
+                                     together",
+                                ));
+                            }
+                            this.skip = Some(Skip::Always);
+                        },
+                    }
                 } else if meta.path.is_ident("skip_if") {
-                    this.skip_if = Some(meta.value()?.parse()?);
+                    match pos {
+                        AttributePosition::Struct => {
+                            return Err(meta.error(
+                                "`skip_if` attribute is only allowed on \
+                                 struct fields",
+                            ));
+                        },
+                        AttributePosition::Field => {
+                            if matches!(this.skip, Some(Skip::Always)) {
+                                return Err(meta.error(
+                                    "`skip` and `skip_if` cannot be used \
+                                     together",
+                                ));
+                            }
+                            let expr = meta.value()?.parse()?;
+                            this.skip = Some(Skip::IfExprTrue(expr));
+                        },
+                    }
                 } else if meta.path.is_ident("into_value") {
                     match pos {
                         AttributePosition::Struct => {
@@ -462,11 +504,15 @@ impl Field {
         field: &syn::Field,
         struct_attrs: &Attributes,
         struct_name: &Ident,
-    ) -> syn::Result<Self> {
+    ) -> syn::Result<Option<Self>> {
         let field_attrs =
             Attributes::parse(&field.attrs, AttributePosition::Field)?;
 
         let field_ident = field.ident.clone().expect("fields are named");
+
+        if matches!(field_attrs.skip.as_ref(), Some(Skip::Always)) {
+            return Ok(None);
+        }
 
         let field_key = {
             let mut key = field_ident.to_string();
@@ -493,14 +539,8 @@ impl Field {
                 )
             })?;
 
-        let should_skip_expr = field_attrs
-            .skip_if
-            .as_ref()
-            .or(struct_attrs.skip_if.as_ref())
-            .cloned();
-
-        let should_skip_expr = should_skip_expr.map(|expr| {
-            quote! {{
+        let should_skip_expr = match &field_attrs.skip {
+            Some(Skip::IfExprTrue(expr)) => Some(quote! {{
                 // This helper lets closures infer the field's type.
                 #[inline(always)]
                 fn __call<T>(f: impl FnOnce(T) -> bool, value: T) -> bool {
@@ -508,8 +548,10 @@ impl Field {
                 }
 
                 __call(#expr, &__value.#field_ident)
-            }}
-        });
+            }}),
+            Some(Skip::Always) => unreachable!("handled above"),
+            None => None,
+        };
 
         let skip_var_name = format_ident!("__should_skip_{field_ident}");
         let field_name = field_ident.to_string();
@@ -519,7 +561,7 @@ impl Field {
         });
         let value_expr = quote! { __value.#field_ident };
 
-        Ok(Self {
+        Ok(Some(Self {
             field_ty: field.ty.clone(),
             field_key,
             field_key_as_c_string,
@@ -528,6 +570,123 @@ impl Field {
             into_value_adapter,
             into_value_expr: field_attrs.into_value,
             value_expr,
-        })
+        }))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use quote::quote;
+    use syn::DeriveInput;
+
+    use super::expand;
+
+    fn expand_tokens(input: proc_macro2::TokenStream) -> String {
+        let input = syn::parse2::<DeriveInput>(input)
+            .expect("derive input should be valid");
+        expand(input).expect("expansion should succeed").to_string()
+    }
+
+    #[test]
+    fn skip_removes_field_from_generated_attrset_type() {
+        let expanded = expand_tokens(quote! {
+            struct Example {
+                #[attrset(skip)]
+                ignored: Unconvertible,
+                retained: String,
+            }
+        });
+
+        assert!(!expanded.contains("Unconvertible"));
+        assert!(!expanded.contains("ignored"));
+        assert!(expanded.contains("String"));
+        assert!(expanded.contains("retained"));
+    }
+
+    #[test]
+    fn skip_if_keeps_field_in_generated_attrset_type() {
+        let expanded = expand_tokens(quote! {
+            struct Example {
+                #[attrset(skip_if = |_| true)]
+                conditional: Unconvertible,
+            }
+        });
+
+        assert!(expanded.contains("Unconvertible"));
+        assert!(expanded.contains("conditional"));
+        assert!(expanded.contains("__should_skip_conditional"));
+    }
+
+    #[test]
+    fn allows_all_fields_to_be_skipped() {
+        let expanded = expand_tokens(quote! {
+            struct Example {
+                #[attrset(skip)]
+                ignored: Unconvertible,
+            }
+        });
+
+        assert!(!expanded.contains("Unconvertible"));
+        assert!(!expanded.contains("ignored"));
+        assert!(!expanded.contains("mut __fun"));
+        assert!(expanded.contains("StaticAttrset < true"));
+        assert!(!expanded.contains("StaticAttrsetWithOptionalFields"));
+    }
+
+    #[test]
+    fn skip_attributes_are_only_allowed_on_fields() {
+        for input in [
+            quote! {
+                #[attrset(skip)]
+                struct Example {
+                    field: String,
+                }
+            },
+            quote! {
+                #[attrset(skip_if = |_| true)]
+                struct Example {
+                    field: String,
+                }
+            },
+        ] {
+            let input = syn::parse2::<DeriveInput>(input)
+                .expect("derive input should be valid");
+
+            let error = expand(input).expect_err("expansion should fail");
+            assert!(
+                error
+                    .to_string()
+                    .contains("attribute is only allowed on struct fields")
+            );
+        }
+    }
+
+    #[test]
+    fn rejects_skip_and_skip_if_on_the_same_field() {
+        for input in [
+            quote! {
+                struct Example {
+                    #[attrset(skip, skip_if = |_| true)]
+                    field: String,
+                }
+            },
+            quote! {
+                struct Example {
+                    #[attrset(skip_if = |_| true)]
+                    #[attrset(skip)]
+                    field: String,
+                }
+            },
+        ] {
+            let input = syn::parse2::<DeriveInput>(input)
+                .expect("derive input should be valid");
+            let error = expand(input).expect_err("expansion should fail");
+
+            assert!(
+                error
+                    .to_string()
+                    .contains("`skip` and `skip_if` cannot be used together")
+            );
+        }
     }
 }
