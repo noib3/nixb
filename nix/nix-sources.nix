@@ -13,10 +13,11 @@
     rev = "2.34.6";
     sha256 = "139j1iwlhy0yv2lr7h96d6vrrb9gq3dp007cgzvx2bp1xj334wwh";
   };
+  # Current HEAD of https://github.com/NixOS/nix/pull/15675
   "2_35" = fetchFromGitHub {
     owner = "NixOS";
     repo = "nix";
-    rev = "152e2880281bbbd9fa03b6215d874eec0d0dc321";
-    sha256 = "0mnnyv616n1b6vf0yaqxj68zgmi8lz3m33as62qqh5dp227k17l1";
+    rev = "9d718847a1b97cc8476cb23c207cacf91ba136ed";
+    sha256 = "11cnvlsfv1wimhljdb5483kfd3gg3vijixf38lzssh4l3c3h7z2l";
   };
 }
