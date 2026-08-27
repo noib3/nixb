@@ -6,6 +6,7 @@ authors.workspace = true
 license.workspace = true
 
 [features]
+embed = ["nixb-cpp/embed"]
 nix-2-35 = ["nixb-cpp/nix-2-35", "nixb-sys/nix-2-35"]
 
 compact_str = ["dep:compact_str"]
@@ -25,6 +26,7 @@ either = { workspace = true, optional = true }
 smallvec = { workspace = true, optional = true, features = ["const_generics"] }
 
 [build-dependencies]
+pkg-config = { workspace = true }
 rustc_version = "0.4"
 
 [lints]

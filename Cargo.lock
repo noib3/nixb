@@ -133,6 +133,7 @@ dependencies = [
  "nixb-error",
  "nixb-macros",
  "nixb-sys",
+ "pkg-config",
  "rustc_version",
  "smallvec",
 ]
@@ -167,6 +168,7 @@ dependencies = [
  "nixb-cpp",
  "nixb-error",
  "nixb-sys",
+ "pkg-config",
 ]
 
 [[package]]
