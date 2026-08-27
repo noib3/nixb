@@ -40,13 +40,19 @@ let
 
   sharedLibraryExt = stdenv.hostPlatform.extensions.sharedLibrary;
 
+  # Plugin examples are compiled to shared libraries that a Nix process
+  # dlopens; the other examples are standalone executables that embed Nix.
+  isPluginExample = example: lib.elem "cdylib" (example.crate-type or [ ]);
+
   mkExamplePackage =
-    nixSourceKey: nixPackage: exampleName:
+    nixSourceKey: nixPackage: example:
     let
       nixFeature = "nix-${builtins.replaceStrings [ "_" ] [ "-" ] nixSourceKey}";
+      isPlugin = isPluginExample example;
+      features = [ nixFeature ] ++ lib.optionals (!isPlugin) [ "embed" ];
     in
     rustPlatform.buildRustPackage {
-      pname = "example-${exampleName}-${nixFeature}";
+      pname = "example-${example.name}-${nixFeature}";
       version = "0.1.0";
       src = examplesSrc;
       cargoLock.lockFile = ../Cargo.lock;
@@ -71,38 +77,61 @@ let
           --locked \
           --manifest-path examples/Cargo.toml \
           --no-default-features \
-          --features ${nixFeature} \
-          --example ${exampleName}
+          --features ${lib.concatStringsSep "," features} \
+          --example ${example.name}
 
         runHook postBuild
       '';
 
-      installPhase = ''
-        runHook preInstall
+      installPhase =
+        if isPlugin then
+          ''
+            runHook preInstall
 
-        mkdir -p "$out/lib"
-        cp "$CARGO_TARGET_DIR/debug/examples/lib${exampleName}${sharedLibraryExt}" "$out/lib/"
+            mkdir -p "$out/lib"
+            cp "$CARGO_TARGET_DIR/debug/examples/lib${example.name}${sharedLibraryExt}" "$out/lib/"
 
-        runHook postInstall
-      '';
+            runHook postInstall
+          ''
+        else
+          ''
+            runHook preInstall
+
+            mkdir -p "$out/bin"
+            cp "$CARGO_TARGET_DIR/debug/examples/${example.name}" "$out/bin/"
+
+            runHook postInstall
+          '';
     };
 
   examplesManifest = builtins.fromTOML (builtins.readFile ../examples/Cargo.toml);
-  exampleNames = map (example: example.name) examplesManifest.example;
 
   mkExamplesBundle =
     nixSourceKey: nixPackage:
     let
       nixFeature = "nix-${builtins.replaceStrings [ "_" ] [ "-" ] nixSourceKey}";
-      examplePackages = lib.genAttrs exampleNames (
-        exampleName: mkExamplePackage nixSourceKey nixPackage exampleName
+      examplePackages = builtins.listToAttrs (
+        map (example: {
+          name = example.name;
+          value = mkExamplePackage nixSourceKey nixPackage example;
+        }) examplesManifest.example
       );
     in
     (linkFarm "examples-${nixFeature}" (
-      map (exampleName: {
-        name = "lib/lib${exampleName}${sharedLibraryExt}";
-        path = "${examplePackages.${exampleName}}/lib/lib${exampleName}${sharedLibraryExt}";
-      }) exampleNames
+      map (
+        example:
+        let
+          relPath =
+            if isPluginExample example then
+              "lib/lib${example.name}${sharedLibraryExt}"
+            else
+              "bin/${example.name}";
+        in
+        {
+          name = relPath;
+          path = "${examplePackages.${example.name}}/${relPath}";
+        }
+      ) examplesManifest.example
     )).overrideAttrs
       {
         passthru = examplePackages;

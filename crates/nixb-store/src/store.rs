@@ -477,6 +477,16 @@ impl Store {
     fn new(ctx: CContext, store: *mut nixb_sys::Store) -> Self {
         Self { ctx, inner: store }
     }
+
+    /// Returns the raw pointer to the underlying Nix store.
+    ///
+    /// Only meant to be used by other `nixb-*` crates whose C libraries take
+    /// a `Store *`, like `nixb-expr`'s eval-state constructors.
+    #[doc(hidden)]
+    #[inline]
+    pub fn as_ptr(&mut self) -> *mut nixb_sys::Store {
+        self.inner
+    }
 }
 
 impl Clone for Store {

@@ -8,7 +8,7 @@ use core::ptr::NonNull;
 use nixb_c_context::CContext;
 use nixb_error::{Error, Result};
 
-use crate::context::{Context, EvalState};
+use crate::context::{Context, EvalStateRef};
 use crate::into_result::IntoResult;
 use crate::value::{
     IntoValue,
@@ -88,7 +88,7 @@ pub trait Thunk {
             // uninitialized Value.
             let dest = unsafe { UninitValue::new(dest) };
 
-            let mut ctx = Context::new(c_context, EvalState::new(state));
+            let mut ctx = Context::new(c_context, EvalStateRef::new(state));
 
             // SAFETY:
             // - userdata is a `*mut Th` created by `Box::into_raw`;

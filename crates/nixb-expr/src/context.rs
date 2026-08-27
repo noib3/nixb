@@ -23,11 +23,15 @@ use crate::value::{
 /// TODO: docs.
 pub struct Context<'eval> {
     inner: CContext,
-    state: EvalState<'eval>,
+    state: EvalStateRef<'eval>,
 }
 
-/// TODO: docs.
-pub struct EvalState<'a> {
+/// A borrowed evaluator state.
+///
+/// This is a view into an evaluator state owned by someone else: either the
+/// host Nix process (in plugin callbacks) or an owned `crate::EvalState` (in
+/// embedded programs, under the `embed` feature).
+pub struct EvalStateRef<'a> {
     inner: NonNull<nixb_sys::EvalState>,
     _lifetime: PhantomData<&'a nixb_sys::EvalState>,
 }
@@ -188,7 +192,7 @@ impl<'eval> Context<'eval> {
     }
 
     #[inline]
-    pub(crate) fn new(inner: CContext, state: EvalState<'eval>) -> Self {
+    pub(crate) fn new(inner: CContext, state: EvalStateRef<'eval>) -> Self {
         Self { inner, state }
     }
 
@@ -208,13 +212,13 @@ impl<'eval> Context<'eval> {
     #[inline]
     pub(crate) fn with_raw_and_state<T>(
         &mut self,
-        fun: impl FnOnce(*mut nixb_sys::c_context, &mut EvalState<'eval>) -> T,
+        fun: impl FnOnce(*mut nixb_sys::c_context, &mut EvalStateRef<'eval>) -> T,
     ) -> Result<T> {
         self.inner.with_ptr(|raw_ctx| fun(raw_ctx, &mut self.state))
     }
 }
 
-impl<'eval> EvalState<'eval> {
+impl<'eval> EvalStateRef<'eval> {
     #[inline]
     pub(crate) fn as_ptr(&mut self) -> *mut nixb_sys::EvalState {
         self.inner.as_ptr()
@@ -320,7 +324,7 @@ impl<'eval> ListBuilder<'_, 'eval> {
 }
 
 impl<'eval> Deref for Context<'eval> {
-    type Target = EvalState<'eval>;
+    type Target = EvalStateRef<'eval>;
 
     #[inline]
     fn deref(&self) -> &Self::Target {

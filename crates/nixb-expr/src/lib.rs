@@ -10,7 +10,11 @@ pub mod builtins;
 pub mod callable;
 pub mod context;
 pub mod error;
+#[cfg(feature = "embed")]
+mod eval_state;
 pub mod function;
+#[cfg(feature = "embed")]
+mod init;
 mod into_result;
 pub mod list;
 mod never;
@@ -21,6 +25,10 @@ pub mod tuple;
 mod utf8_cstr;
 pub mod value;
 
+#[cfg(feature = "embed")]
+pub use eval_state::EvalState;
+#[cfg(feature = "embed")]
+pub use init::{InitSentinel, init};
 pub use into_result::IntoResult;
 pub use never::Never;
 pub use nixb_macros::{Attrset, SetPattern, Value};
