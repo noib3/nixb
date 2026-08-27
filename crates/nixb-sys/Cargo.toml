@@ -6,9 +6,7 @@ authors.workspace = true
 license.workspace = true
 
 [features]
-nix-2-33 = []
-nix-2-34 = ["nix-2-33"]
-nix-2-35 = ["nix-2-34"]
+nix-2-35 = []
 
 [lints]
 workspace = true

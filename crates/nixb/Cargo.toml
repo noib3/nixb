@@ -6,37 +6,20 @@ authors.workspace = true
 license.workspace = true
 
 [features]
-default = ["nix-2-34"]
+default = ["nix-2-35"]
 
-# Nix versions.
-nix-2-33 = [
-  "nixb-expr?/nix-2-33",
-  "nixb-plugin?/nix-2-33",
-  "nixb-store?/nix-2-33",
-]
-nix-2-34 = [
-  "nix-2-33",
-  "nixb-expr?/nix-2-34",
-  "nixb-plugin?/nix-2-34",
-  "nixb-store?/nix-2-34",
-]
+compact_str = ["nixb-expr?/compact_str"]
+either = ["nixb-expr?/either"]
+expr = ["nixb-expr"]
 nix-2-35 = [
-  "nix-2-34",
   "nixb-expr?/nix-2-35",
   "nixb-plugin?/nix-2-35",
   "nixb-store?/nix-2-35",
 ]
-
-# Module-enabling features.
-expr = ["nixb-expr"]
 plugin = ["nixb-plugin"]
-store = ["nixb-store"]
-
-# Passthrough features.
-compact_str = ["nixb-expr?/compact_str"]
-either = ["nixb-expr?/either"]
 smallvec = ["nixb-expr?/smallvec"]
 std = ["nixb-expr?/std"]
+store = ["nixb-store"]
 
 [dependencies]
 nixb-c-context = { workspace = true }

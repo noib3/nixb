@@ -97,12 +97,6 @@ pub trait Function {
 
             let fun = Fun::from_userdata(userdata);
 
-            #[cfg(not(feature = "nix-2-33"))]
-            let Some(args_ptr) = NonNull::new(args_raw) else {
-                panic!("received NULL args pointer in primop call");
-            };
-
-            #[cfg(feature = "nix-2-33")]
             let args_ptr = match NonNull::new(args_raw) {
                 Some(args_ptr) => args_ptr,
                 None if fun.args_arity() == 0 => NonNull::dangling(),
