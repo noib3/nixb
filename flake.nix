@@ -161,7 +161,7 @@
         in
         nixSourceShells
         // {
-          default = nixSourceShells."nix-2-34";
+          default = nixSourceShells."nix-2-35";
         }
       );
 

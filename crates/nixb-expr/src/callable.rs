@@ -208,17 +208,6 @@ pub trait Callable {
             let args = call.args_mut();
 
             unsafe {
-                #[cfg(not(feature = "nix-2-34"))]
-                nixb_cpp::value_call_multi(
-                    ctx,
-                    state,
-                    function,
-                    args.len(),
-                    args.as_mut_ptr(),
-                    dest,
-                );
-
-                #[cfg(feature = "nix-2-34")]
                 nixb_sys::value_call_multi(
                     ctx,
                     state,

@@ -5,7 +5,6 @@
 #include "nix_api_util.h"
 #include "nix_api_util_internal.h"
 
-#ifdef NIX_2_34
 using RustCallback = void (*)(void *, nix_c_context *, EvalState *,
                               nix_value **, nix_value *);
 
@@ -15,10 +14,6 @@ static nix_value *new_nix_value(nix::Value *value, nix::EvalMemory &mem) {
       .mem = &mem,
   };
 }
-#else
-using RustCallback = void (*)(void *, nix_c_context *, nix::EvalState *,
-                              nix::Value **, nix::Value *);
-#endif
 
 /// Custom ExprLambda that calls a Rust callback when fully applied.
 ///
@@ -101,7 +96,6 @@ struct ExprRustLambda : nix::ExprLambda {
       all_args[i] = args[i];
     all_args[argc] = arg;
 
-#ifdef NIX_2_34
     nix::Value v_tmp;
     nix_value *external_args[nix::maxPrimOpArity];
     for (size_t i = 0; i <= argc; ++i)
@@ -118,14 +112,6 @@ struct ExprRustLambda : nix::ExprLambda {
     // Call the Rust callback using C API wrapper types.
     shared->callback(shared->userdata, &ctx, &wrapper, external_args,
                      v_tmp_ptr);
-#else
-    // Reset v for initialization (it may contain a blackhole)
-    new (&v) nix::Value();
-
-    // Call the Rust callback
-    // NOTE: userdata is NOT consumed - function can be called multiple times
-    shared->callback(shared->userdata, &ctx, &state, all_args, &v);
-#endif
 
     if (ctx.last_err_code != NIX_OK) {
       const char *err_msg = "unknown error in function callback";
@@ -135,7 +121,6 @@ struct ExprRustLambda : nix::ExprLambda {
       throw nix::Error("%s", err_msg);
     }
 
-#ifdef NIX_2_34
     if (!v_tmp.isValid()) {
       throw nix::Error("Implementation error in function callback: return "
                        "value was not initialized");
@@ -147,12 +132,6 @@ struct ExprRustLambda : nix::ExprLambda {
     }
 
     v = v_tmp;
-#else
-    if (!v.isValid()) {
-      throw nix::Error("Implementation error in function callback: return "
-                       "value was not initialized");
-    }
-#endif
   }
 
   void bindVars(nix::EvalState &,
@@ -199,11 +178,7 @@ extern "C" {
 /// - For static userdata (&'static references), pass nullptr for on_drop
 /// - For allocated userdata, on_drop should free it
 nix_err init_function(nix_c_context *context,
-#ifdef NIX_2_34
                       EvalState *state, nix_value *value,
-#else
-                      nix::EvalState *state, nix::Value *value,
-#endif
                       const char *name, size_t name_len, size_t arity,
                       const char **args, void *userdata, RustCallback callback,
                       void (*on_drop)(void *)) {
@@ -223,11 +198,7 @@ nix_err init_function(nix_c_context *context,
     for (size_t i = 0; i < arity; ++i) {
       if (!args[i])
         throw nix::Error("function argument name at index %d is null", (int)i);
-#ifdef NIX_2_34
       arg_syms[i] = state->state.symbols.create(args[i]);
-#else
-      arg_syms[i] = state->symbols.create(args[i]);
-#endif
     }
 
     auto *shared = new
@@ -236,11 +207,7 @@ nix_err init_function(nix_c_context *context,
 #endif
             RustFunctionData(
                 userdata, callback, on_drop, arity,
-#ifdef NIX_2_34
                 state->state.symbols.create(std::string_view{name, name_len}),
-#else
-            state->symbols.create(std::string_view{name, name_len}),
-#endif
                 arg_syms);
 
     auto *lambda = new
@@ -249,11 +216,7 @@ nix_err init_function(nix_c_context *context,
 #endif
             ExprRustLambda(shared, 0, nullptr);
 
-#ifdef NIX_2_34
     value->value->mkLambda(&state->state.baseEnv, lambda);
-#else
-    value->mkLambda(&state->baseEnv, lambda);
-#endif
   }
   NIXC_CATCH_ERRS
 }

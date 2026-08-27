@@ -9,7 +9,7 @@ license.workspace = true
 nixb-error = { workspace = true }
 # We only need nixb-sys for a very limited set of bindings which are unlikely to
 # change between releases, so we can just pick an arbitrary Nix version.
-nixb-sys = { workspace = true, features = ["nix-2-34"] }
+nixb-sys = { workspace = true, features = ["nix-2-35"] }
 
 [lints]
 workspace = true

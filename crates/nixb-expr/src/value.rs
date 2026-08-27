@@ -336,10 +336,6 @@ impl<Owner: ValueOwner> Value for NixValue<Owner> {
     #[inline]
     fn force_inline(&mut self, ctx: &mut Context) -> Result<()> {
         ctx.with_raw_and_state(|ctx, state| unsafe {
-            #[cfg(not(feature = "nix-2-34"))]
-            nixb_cpp::force_value(ctx, state.as_ptr(), self.as_ptr());
-
-            #[cfg(feature = "nix-2-34")]
             nixb_sys::value_force(ctx, state.as_ptr(), self.as_ptr());
         })
     }
@@ -798,15 +794,6 @@ impl Value for &std::path::Path {
         // Having an `UninitValue` guards against 1) and 2), while 3) and 4) are
         // allocation/capacity failures which we panic on.
         ctx.with_raw_and_state(|ctx, state| unsafe {
-            #[cfg(not(feature = "nix-2-34"))]
-            nixb_cpp::init_path_string(
-                ctx,
-                state.as_ptr(),
-                dest.as_ptr(),
-                c_string.as_ptr(),
-            );
-
-            #[cfg(feature = "nix-2-34")]
             nixb_sys::init_path_string(
                 ctx,
                 state.as_ptr(),

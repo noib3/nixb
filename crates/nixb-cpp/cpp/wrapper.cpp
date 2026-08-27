@@ -6,7 +6,6 @@
 #include "nix_api_util_internal.h"
 #include "nix_api_value.h"
 
-#ifdef NIX_2_34
 static const nix::Value &check_value_not_null(const nix_value *value) {
   if (!value) {
     throw std::runtime_error("nix_value is null");
@@ -20,45 +19,10 @@ static nix_value *borrow_nix_value(nix::Value *value, nix::EvalMemory &mem) {
       .mem = &mem,
   };
 }
-#endif
 
 // Attrsets.
 
-#ifndef NIX_2_34
-extern "C" nix::BindingsBuilder *make_bindings_builder(nix::EvalState *state,
-                                                       size_t capacity) noexcept {
-  try {
-    // buildBindings returns by value, so we allocate on heap.
-    return new nix::BindingsBuilder(state->buildBindings(capacity));
-  } catch (...) {
-    return nullptr;
-  }
-}
-
-extern "C" nix_err bindings_builder_insert(nix_c_context *context,
-                                           nix::BindingsBuilder *builder,
-                                           const char *name,
-                                           nix::Value *value) {
-  if (context)
-    context->last_err_code = NIX_OK;
-  try {
-    nix::Symbol sym = builder->symbols.get().create(name);
-    builder->insert(sym, value);
-  }
-  NIXC_CATCH_ERRS
-}
-
-extern "C" void make_attrs(nix::Value *v, nix::BindingsBuilder *builder) {
-  v->mkAttrs(*builder);
-}
-
-extern "C" void bindings_builder_free(nix::BindingsBuilder *builder) {
-  delete builder;
-}
-#endif
-
 extern "C"
-#ifdef NIX_2_34
     nix_value *get_attr_byname_lazy_no_incref(const nix_value *value,
                                               EvalState *state,
                                               const char *name) {
@@ -69,47 +33,21 @@ extern "C"
   }
   return borrow_nix_value(attr->value, state->state.mem);
 }
-#else
-    nix::Value *get_attr_byname_lazy_no_incref(const nix::Value *value,
-                                               nix::EvalState *state,
-                                               const char *name) {
-  nix::Symbol sym = state->symbols.create(name);
-  const nix::Attr *attr = value->attrs()->get(sym);
-  if (!attr) {
-    return nullptr;
-  }
-  return attr->value;
-}
-#endif
 
 // Attrset iterator.
 
 struct AttrIterator {
   nix::Bindings::const_iterator current;
   const nix::SymbolTable *symbols;
-#ifdef NIX_2_34
   nix::EvalMemory *mem;
-#endif
 };
 
 extern "C" AttrIterator *attr_iter_create(
-#ifdef NIX_2_34
     const nix_value *value, EvalState *state
-#else
-    const nix::Value *value, nix::EvalState *state
-#endif
 ) {
-#ifdef NIX_2_34
   const nix::Bindings *bindings = check_value_not_null(value).attrs();
-#else
-  const nix::Bindings *bindings = value->attrs();
-#endif
   return new AttrIterator{bindings->begin(),
-#ifdef NIX_2_34
                           &state->state.symbols, &state->state.mem
-#else
-                          &state->symbols
-#endif
   };
 }
 
@@ -118,17 +56,9 @@ extern "C" const char *attr_iter_key(const AttrIterator *iter) {
 }
 
 extern "C"
-#ifdef NIX_2_34
     nix_value *
-#else
-    nix::Value *
-#endif
     attr_iter_value(const AttrIterator *iter) {
-#ifdef NIX_2_34
   return borrow_nix_value(iter->current->value, *iter->mem);
-#else
-  return iter->current->value;
-#endif
 }
 
 extern "C" void attr_iter_advance(AttrIterator *iter) { ++iter->current; }
@@ -138,146 +68,24 @@ extern "C" void attr_iter_destroy(AttrIterator *iter) { delete iter; }
 // Builtins.
 
 extern "C"
-#ifdef NIX_2_34
     nix_value *get_builtins(EvalState *state) {
   return borrow_nix_value(state->state.baseEnv.values[0], state->state.mem);
 }
-#else
-    nix::Value *get_builtins(nix::EvalState *state) {
-  // builtins is the first value in baseEnv
-  return state->baseEnv.values[0];
-}
-#endif
 
 // Expression evaluation.
 
-#ifndef NIX_2_34
-extern "C" nix_err expr_eval_from_string(nix_c_context *context,
-                                         nix::EvalState *state,
-                                         const char *expr, const char *path,
-                                         nix::Value *value) {
-  if (context)
-    context->last_err_code = NIX_OK;
-  try {
-    nix::Expr *parsedExpr =
-        state->parseExprFromString(expr, state->rootPath(nix::CanonPath(path)));
-    state->eval(parsedExpr, *value);
-    state->forceValue(*value, nix::noPos);
-  }
-  NIXC_CATCH_ERRS
-}
-#endif
-
 // Lists.
 
-#ifndef NIX_2_34
-extern "C" nix::ListBuilder *make_list_builder(nix::EvalState *state,
-                                               size_t size) noexcept {
-  try {
-    return new nix::ListBuilder(state->buildList(size));
-  } catch (...) {
-    return nullptr;
-  }
-}
-
-extern "C" void list_builder_insert(nix::ListBuilder *builder, size_t index,
-                                    nix::Value *value) {
-  (*builder)[index] = value;
-}
-
-extern "C" void make_list(nix::Value *v, nix::ListBuilder *builder) {
-  v->mkList(*builder);
-}
-
-extern "C" void list_builder_free(nix::ListBuilder *builder) {
-  delete builder;
-}
-#endif
-
 extern "C"
-#ifdef NIX_2_34
     nix_value *get_list_byidx_lazy_no_incref(const nix_value *value,
                                              unsigned int ix) {
   return borrow_nix_value(check_value_not_null(value).listView()[ix],
                           *value->mem);
 }
-#else
-    nix::Value *get_list_byidx_lazy_no_incref(const nix::Value *value,
-                                              unsigned int ix) {
-  return value->listView()[ix];
-}
-#endif
 
 // String realization (IFD).
 
-#ifndef NIX_2_34
-extern "C" nix_realised_string *string_realise(nix_c_context *context,
-                                               nix::EvalState *state,
-                                               nix::Value *value, bool isIFD) {
-  if (context)
-    context->last_err_code = NIX_OK;
-  try {
-    nix::StorePathSet storePaths;
-    auto s = state->realiseString(*value, &storePaths, isIFD);
-
-    std::vector<StorePath> vec;
-    for (auto &sp : storePaths) {
-      vec.push_back(StorePath{sp});
-    }
-
-    return new nix_realised_string{.str = s, .storePaths = vec};
-  }
-  NIXC_CATCH_ERRS_NULL
-}
-#endif
-
 // Values.
-
-#ifndef NIX_2_34
-extern "C" nix::Value *alloc_value(nix::EvalState *state) noexcept {
-  try {
-    nix::Value *res = state->allocValue();
-    nix_gc_incref(nullptr, res);
-    return res;
-  } catch (...) {
-    return nullptr;
-  }
-}
-
-extern "C" nix_err force_value(nix_c_context *context, nix::EvalState *state,
-                               nix::Value *value) {
-  if (context)
-    context->last_err_code = NIX_OK;
-  try {
-    state->forceValue(*value, nix::noPos);
-  }
-  NIXC_CATCH_ERRS
-}
-
-extern "C" nix_err init_path_string(nix_c_context *context,
-                                    nix::EvalState *state, nix::Value *value,
-                                    const char *str) {
-  if (context)
-    context->last_err_code = NIX_OK;
-  try {
-    value->mkPath(state->rootPath(nix::CanonPath(str)), state->mem);
-  }
-  NIXC_CATCH_ERRS
-}
-
-extern "C" nix_err value_call_multi(nix_c_context *context,
-                                    nix::EvalState *state, nix::Value *fn,
-                                    size_t nargs, nix::Value **args,
-                                    nix::Value *result) {
-  if (context)
-    context->last_err_code = NIX_OK;
-  try {
-    state->callFunction(*fn, {args, nargs}, *result, nix::noPos);
-    state->forceValue(*result, nix::noPos);
-  }
-  NIXC_CATCH_ERRS
-}
-#endif
 
 // Thunk lifecycle and cleanup guarantees:
 //
@@ -293,44 +101,24 @@ extern "C" nix_err value_call_multi(nix_c_context *context,
 // The userdata=null assignment after on_force_once prevents on_drop from
 // being called in the destructor for forced thunks.
 extern "C" nix_err init_thunk(nix_c_context *context,
-#ifdef NIX_2_34
                               EvalState *state, nix_value *value,
-#else
-                              nix::EvalState *state, nix::Value *value,
-#endif
                               void *userdata,
-#ifdef NIX_2_34
                               void (*on_force_once)(nix_c_context *,
                                                     EvalState *, nix_value *,
                                                     void *),
-#else
-                              void (*on_force_once)(nix_c_context *,
-                                                    nix::EvalState *,
-                                                    nix::Value *, void *),
-#endif
                               void (*on_drop)(void *)) {
   // Custom Expr subclass that invokes a Rust callback when evaluated.
   // Note: This is defined outside the try block since struct definitions cannot
   // throw.
   struct ExprRustCallback : nix::Expr {
     void *userdata;
-#ifdef NIX_2_34
     void (*on_force_once)(nix_c_context *, EvalState *, nix_value *, void *);
-#else
-    void (*on_force_once)(nix_c_context *, nix::EvalState *, nix::Value *,
-                          void *);
-#endif
     void (*on_drop)(void *);
     bool is_evaluating = false;
 
     ExprRustCallback(void *data,
-#ifdef NIX_2_34
                      void (*callback)(nix_c_context *, EvalState *, nix_value *,
                                       void *),
-#else
-                     void (*callback)(nix_c_context *, nix::EvalState *,
-                                      nix::Value *, void *),
-#endif
                      void (*drop)(void *))
         : userdata(data), on_force_once(callback), on_drop(drop) {
     }
@@ -373,7 +161,6 @@ extern "C" nix_err init_thunk(nix_c_context *context,
       new (&v) nix::Value();
 
       // The callback is expected to initialize v with the actual result.
-#ifdef NIX_2_34
       EvalState wrapper{
           .state = state,
           .ownedFetchSettings = nullptr,
@@ -382,9 +169,6 @@ extern "C" nix_err init_thunk(nix_c_context *context,
       };
       nix_value wrapped_value{.value = &v, .mem = &state.mem};
       on_force_once(&ctx, &wrapper, &wrapped_value, userdata);
-#else
-      on_force_once(&ctx, &state, &v, userdata);
-#endif
 
       // on_force_once has consumed the userdata - set to null to prevent
       // the destructor from calling on_drop.
@@ -415,11 +199,7 @@ extern "C" nix_err init_thunk(nix_c_context *context,
   // Only allocating ExprRustCallback can throw; mkThunk is noexcept.
   try {
     auto *expr = new ExprRustCallback(userdata, on_force_once, on_drop);
-#ifdef NIX_2_34
     value->value->mkThunk(&state->state.baseEnv, expr);
-#else
-    value->mkThunk(&state->baseEnv, expr);
-#endif
   }
   NIXC_CATCH_ERRS
 }

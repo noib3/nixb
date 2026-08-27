@@ -6,11 +6,10 @@ authors.workspace = true
 license.workspace = true
 
 [features]
+embed = []
 expr = []
+nix-2-35 = ["nixb-sys/nix-2-35"]
 store = []
-nix-2-33 = ["nixb-sys/nix-2-33"]
-nix-2-34 = ["nix-2-33", "nixb-sys/nix-2-34"]
-nix-2-35 = ["nix-2-34", "nixb-sys/nix-2-35"]
 
 [dependencies]
 nixb-sys = { workspace = true }

@@ -29,9 +29,7 @@ jobs:
       fail-fast: false
       matrix:
         nix-version:
-          - 2.32
-          - 2.33
-          - 2.34
+          - 2.35
     steps:
       - uses: actions/checkout@v6
       - uses: DeterminateSystems/nix-installer-action@main

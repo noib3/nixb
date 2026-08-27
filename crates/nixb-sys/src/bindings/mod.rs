@@ -14,20 +14,10 @@
 #![allow(rustdoc::broken_intra_doc_links)]
 #![allow(rustdoc::invalid_html_tags)]
 
-#[cfg(not(feature = "nix-2-33"))]
+#[cfg(not(feature = "nix-2-35"))]
 compile_error!(
-    "Enable one of the Nix version features: nix-2-33, nix-2-34, nix-2-35"
+    "Enable one of the Nix version features: nix-2-35"
 );
-
-#[cfg(all(feature = "nix-2-33", not(feature = "nix-2-34")))]
-#[rustfmt::skip]
-#[path = "2_33.rs"]
-mod selected;
-
-#[cfg(all(feature = "nix-2-34", not(feature = "nix-2-35")))]
-#[rustfmt::skip]
-#[path = "2_34.rs"]
-mod selected;
 
 #[cfg(feature = "nix-2-35")]
 #[rustfmt::skip]

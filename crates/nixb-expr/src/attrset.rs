@@ -556,16 +556,6 @@ impl<Owner: ValueOwner> NixDerivation<Owner> {
             .into_inner();
 
         let realised_str = ctx.with_raw_and_state(|ctx, state| unsafe {
-            #[cfg(not(feature = "nix-2-34"))]
-            {
-                nixb_cpp::string_realise(
-                    ctx,
-                    state.as_ptr(),
-                    value.as_ptr(),
-                    true,
-                )
-            }
-            #[cfg(feature = "nix-2-34")]
             nixb_sys::string_realise(ctx, state.as_ptr(), value.as_ptr(), true)
         })?;
 

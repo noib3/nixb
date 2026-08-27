@@ -6,15 +6,17 @@ authors.workspace = true
 license.workspace = true
 
 [features]
-nix-2-33 = ["nixb-cpp/nix-2-33", "nixb-sys/nix-2-33"]
-nix-2-34 = ["nix-2-33", "nixb-cpp/nix-2-34", "nixb-sys/nix-2-34"]
-nix-2-35 = ["nix-2-34", "nixb-cpp/nix-2-35", "nixb-sys/nix-2-35"]
+embed = ["nixb-cpp/embed"]
+nix-2-35 = ["nixb-cpp/nix-2-35", "nixb-sys/nix-2-35"]
 
 [dependencies]
 nixb-c-context = { workspace = true }
 nixb-cpp = { workspace = true, features = ["store"] }
 nixb-error = { workspace = true }
 nixb-sys = { workspace = true }
+
+[build-dependencies]
+pkg-config = { workspace = true }
 
 [lints]
 workspace = true

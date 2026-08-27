@@ -74,16 +74,6 @@ impl<'eval> Context<'eval> {
         let dest = self.alloc_value();
 
         self.with_raw_and_state(|raw_ctx, state| unsafe {
-            #[cfg(not(feature = "nix-2-34"))]
-            nixb_cpp::expr_eval_from_string(
-                raw_ctx,
-                state.as_ptr(),
-                expr.as_ptr(),
-                c".".as_ptr(),
-                dest.as_ptr(),
-            );
-
-            #[cfg(feature = "nix-2-34")]
             nixb_sys::expr_eval_from_string(
                 raw_ctx,
                 state.as_ptr(),
@@ -119,10 +109,6 @@ impl<'eval> Context<'eval> {
     /// [`nixb_sys::value_decref`] once it is no longer needed.
     #[inline]
     pub(crate) fn alloc_value(&mut self) -> UninitValue {
-        #[cfg(not(feature = "nix-2-34"))]
-        let raw_ptr = unsafe { nixb_cpp::alloc_value(self.state.as_ptr()) };
-
-        #[cfg(feature = "nix-2-34")]
         let raw_ptr = self
             .inner
             .with_ptr(|ctx| unsafe {
@@ -151,13 +137,6 @@ impl<'eval> Context<'eval> {
         capacity: c_uint,
     ) -> AttrsetBuilder<'_, 'eval> {
         unsafe {
-            #[cfg(not(feature = "nix-2-34"))]
-            let builder_ptr = nixb_cpp::make_bindings_builder(
-                self.state.as_ptr(),
-                capacity as _,
-            );
-
-            #[cfg(feature = "nix-2-34")]
             let builder_ptr = self
                 .inner
                 .with_ptr(|ptr| {
@@ -187,11 +166,6 @@ impl<'eval> Context<'eval> {
         capacity: c_uint,
     ) -> ListBuilder<'_, 'eval> {
         unsafe {
-            #[cfg(not(feature = "nix-2-34"))]
-            let builder_ptr =
-                nixb_cpp::make_list_builder(self.state.as_ptr(), capacity as _);
-
-            #[cfg(feature = "nix-2-34")]
             let builder_ptr = self
                 .inner
                 .with_ptr(|ptr| {
@@ -255,11 +229,6 @@ impl<'eval> EvalState<'eval> {
 impl<'eval> AttrsetBuilder<'_, 'eval> {
     #[inline]
     pub(crate) fn build(self, dest: UninitValue) {
-        #[cfg(not(feature = "nix-2-34"))]
-        unsafe {
-            nixb_cpp::make_attrs(dest.as_ptr(), self.inner.as_ptr());
-        }
-
         // `nix_make_attrs` errors when:
         //
         // 1. the destination pointer is null;
@@ -269,7 +238,6 @@ impl<'eval> AttrsetBuilder<'_, 'eval> {
         // Having an `UninitValue` guards against 1) and 2). The builder's
         // bindings contain trivially movable `Attr`s whose comparison only
         // compares `Symbol`s, which is `noexcept`, so 3) cannot happen.
-        #[cfg(feature = "nix-2-34")]
         unsafe {
             nixb_sys::make_attrs(
                 core::ptr::null_mut(),
@@ -296,15 +264,6 @@ impl<'eval> AttrsetBuilder<'_, 'eval> {
 
         self.context
             .with_raw(|ctx| unsafe {
-                #[cfg(not(feature = "nix-2-34"))]
-                nixb_cpp::bindings_builder_insert(
-                    ctx,
-                    self.inner.as_ptr(),
-                    key.as_ptr(),
-                    dest.as_ptr(),
-                );
-
-                #[cfg(feature = "nix-2-34")]
                 nixb_sys::bindings_builder_insert(
                     ctx,
                     self.inner.as_ptr(),
@@ -321,18 +280,12 @@ impl<'eval> AttrsetBuilder<'_, 'eval> {
 impl<'eval> ListBuilder<'_, 'eval> {
     #[inline]
     pub(crate) fn build(self, dest: UninitValue) {
-        #[cfg(not(feature = "nix-2-34"))]
-        unsafe {
-            nixb_cpp::make_list(dest.as_ptr(), self.inner.as_ptr());
-        }
-
         // `nix_make_list` errors when:
         //
         // 1. the destination pointer is null;
         // 2. the destination value is already initialized.
         //
         // Having an `UninitValue` guards against both, so neither can happen.
-        #[cfg(feature = "nix-2-34")]
         unsafe {
             nixb_sys::make_list(
                 core::ptr::null_mut(),
@@ -350,19 +303,9 @@ impl<'eval> ListBuilder<'_, 'eval> {
         let dest = self.context.alloc_value();
         write_value(dest, self.context);
 
-        #[cfg(not(feature = "nix-2-34"))]
-        unsafe {
-            nixb_cpp::list_builder_insert(
-                self.inner.as_ptr(),
-                self.index,
-                dest.as_ptr(),
-            );
-        }
-
         // `nix_list_builder_insert` only errors when the value pointer is
         // null. Having an `UninitValue` guards against that, so it cannot
         // happen.
-        #[cfg(feature = "nix-2-34")]
         unsafe {
             nixb_sys::list_builder_insert(
                 core::ptr::null_mut(),
@@ -409,12 +352,6 @@ impl<'eval> AsMut<Context<'eval>> for ListBuilder<'_, 'eval> {
 impl Drop for AttrsetBuilder<'_, '_> {
     #[inline]
     fn drop(&mut self) {
-        #[cfg(not(feature = "nix-2-34"))]
-        unsafe {
-            nixb_cpp::bindings_builder_free(self.inner.as_ptr());
-        }
-
-        #[cfg(feature = "nix-2-34")]
         unsafe {
             nixb_sys::bindings_builder_free(self.inner.as_ptr());
         }
@@ -424,12 +361,6 @@ impl Drop for AttrsetBuilder<'_, '_> {
 impl Drop for ListBuilder<'_, '_> {
     #[inline]
     fn drop(&mut self) {
-        #[cfg(not(feature = "nix-2-34"))]
-        unsafe {
-            nixb_cpp::list_builder_free(self.inner.as_ptr());
-        }
-
-        #[cfg(feature = "nix-2-34")]
         unsafe {
             nixb_sys::list_builder_free(self.inner.as_ptr());
         }
