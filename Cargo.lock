@@ -87,6 +87,7 @@ dependencies = [
  "nixb-c-context",
  "nixb-error",
  "nixb-expr",
+ "nixb-fetchers",
  "nixb-plugin",
  "nixb-store",
 ]
@@ -137,6 +138,16 @@ dependencies = [
  "pkg-config",
  "rustc_version",
  "smallvec",
+]
+
+[[package]]
+name = "nixb-fetchers"
+version = "0.1.0"
+dependencies = [
+ "nixb-c-context",
+ "nixb-error",
+ "nixb-sys",
+ "pkg-config",
 ]
 
 [[package]]

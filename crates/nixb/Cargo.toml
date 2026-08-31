@@ -10,10 +10,15 @@ default = ["nix-2-35"]
 
 compact_str = ["nixb-expr?/compact_str"]
 either = ["nixb-expr?/either"]
-embed = ["nixb-expr?/embed", "nixb-store?/embed"]
+embed = [
+  "nixb-expr?/embed",
+  "nixb-store?/embed",
+]
 expr = ["nixb-expr"]
+fetchers = ["nixb-fetchers"]
 nix-2-35 = [
   "nixb-expr?/nix-2-35",
+  "nixb-fetchers?/nix-2-35",
   "nixb-plugin?/nix-2-35",
   "nixb-store?/nix-2-35",
 ]
@@ -27,6 +32,7 @@ nixb-c-context = { workspace = true }
 nixb-error = { workspace = true }
 
 nixb-expr = { workspace = true, optional = true }
+nixb-fetchers = { workspace = true, optional = true }
 nixb-plugin = { workspace = true, optional = true }
 nixb-store = { workspace = true, optional = true }
 

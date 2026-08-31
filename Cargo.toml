@@ -28,6 +28,7 @@ nixb-c-context = { path = "./crates/nixb-c-context" }
 nixb-cpp = { path = "./crates/nixb-cpp" }
 nixb-error = { path = "./crates/nixb-error" }
 nixb-expr = { path = "./crates/nixb-expr" }
+nixb-fetchers = { path = "./crates/nixb-fetchers" }
 nixb-macros = { path = "./crates/nixb-macros" }
 nixb-plugin = { path = "./crates/nixb-plugin" }
 nixb-store = { path = "./crates/nixb-store" }

@@ -1,0 +1,20 @@
+[package]
+name = "nixb-fetchers"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[features]
+nix-2-35 = ["nixb-sys/nix-2-35"]
+
+[dependencies]
+nixb-c-context = { workspace = true }
+nixb-error = { workspace = true }
+nixb-sys = { workspace = true }
+
+[build-dependencies]
+pkg-config = { workspace = true }
+
+[lints]
+workspace = true

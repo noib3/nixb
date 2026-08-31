@@ -5,6 +5,9 @@ pub use nixb_error::{Error, ErrorKind, Result};
 #[cfg(feature = "expr")]
 #[doc(inline)]
 pub use nixb_expr as expr;
+#[cfg(feature = "fetchers")]
+#[doc(inline)]
+pub use nixb_fetchers as fetchers;
 #[cfg(feature = "plugin")]
 #[doc(inline)]
 pub use nixb_plugin as plugin;
