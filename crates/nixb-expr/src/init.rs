@@ -9,9 +9,7 @@ use nixb_c_context::CContext;
 #[inline]
 pub fn init() -> nixb_error::Result<InitSentinel> {
     let mut ctx = CContext::create();
-
     ctx.with_ptr(|ctx| unsafe { nixb_sys::libexpr_init(ctx) })?;
-
     Ok(InitSentinel { ctx })
 }
 
