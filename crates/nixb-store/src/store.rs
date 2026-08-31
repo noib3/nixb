@@ -481,7 +481,7 @@ impl Store {
     /// Returns the raw pointer to the underlying Nix store.
     ///
     /// Only meant to be used by other `nixb-*` crates whose C libraries take
-    /// a `Store *`, like `nixb-expr`'s eval-state constructors.
+    /// a `Store *`.
     #[doc(hidden)]
     #[inline]
     pub fn as_ptr(&mut self) -> *mut nixb_sys::Store {

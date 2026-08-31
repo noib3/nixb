@@ -20,11 +20,17 @@ pub struct InitSentinel {
     pub(crate) ctx: CContext,
 }
 
+impl Clone for InitSentinel {
+    fn clone(&self) -> Self {
+        Self { ctx: CContext::create() }
+    }
+}
+
 /// `nix_libexpr_init` transitively runs `nix_libstore_init`, so this sentinel
 /// is strictly stronger than `nixb-store`'s.
 impl From<InitSentinel> for nixb_store::InitSentinel {
     #[inline]
     fn from(init: InitSentinel) -> Self {
-        Self::from_c_context(init.ctx)
+        Self::new(init.ctx)
     }
 }

@@ -26,10 +26,10 @@ impl InitSentinel {
     ///
     /// Only meant to be used by other `nixb-*` crates whose initialization
     /// routines are documented by the C API to transitively run
-    /// `nix_libstore_init`, like `nixb-expr`'s.
+    /// `nix_libstore_init` (like `nixb-expr`'s).
     #[doc(hidden)]
     #[inline]
-    pub fn from_c_context(ctx: CContext) -> Self {
+    pub fn new(ctx: CContext) -> Self {
         Self { ctx }
     }
 }

@@ -1,8 +1,5 @@
-//! Embeds Nix in a standalone executable instead of being loaded as a
-//! plugin: opens a store, creates an evaluator state, and evaluates an
-//! expression.
-
-use core::ffi::CStr;
+//! Embeds Nix in a standalone executable, opens a store, creates an evaluator
+//! state, and evaluates an expression.
 
 use nixb::expr::EvalState;
 use nixb::store::Store;
@@ -10,15 +7,9 @@ use nixb::store::Store;
 fn main() -> nixb::Result<()> {
     let init = nixb::expr::init()?;
 
-    let mut store = Store::open(init.into(), c"dummy://", [])?;
+    let mut store = Store::open(init.clone().into(), c"dummy://", [])?;
 
-    // `init` is idempotent, and opening the store consumed the previous
-    // sentinel.
-    let init = nixb::expr::init()?;
-
-    let lookup_path: [&CStr; 0] = [];
-
-    let mut state = EvalState::new(init, lookup_path, &mut store)?;
+    let mut state = EvalState::new(init, [], &mut store)?;
 
     let mut ctx = state.context();
 

@@ -8,7 +8,8 @@ use core::ptr::NonNull;
 use nixb_c_context::CContext;
 use nixb_error::{Error, Result};
 
-use crate::context::{Context, EvalStateRef};
+use crate::context::Context;
+use crate::eval_state::EvalStateRef;
 use crate::into_result::IntoResult;
 use crate::value::{
     IntoValue,

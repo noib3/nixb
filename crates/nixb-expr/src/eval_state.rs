@@ -1,39 +1,38 @@
 use alloc::vec::Vec;
 use core::ffi::CStr;
+use core::marker::PhantomData;
 use core::ptr::{self, NonNull};
 
 use nixb_c_context::CContext;
 use nixb_error::Result;
 use nixb_store::Store;
 
-use crate::context::{Context, EvalStateRef};
+use crate::context::Context;
 use crate::init::InitSentinel;
 
 /// An owned evaluator state.
-///
-/// Unlike [`EvalStateRef`], which borrows a state owned by the host Nix
-/// process, this is a state created (and eventually freed) by us, allowing
-/// standalone executables that embed Nix to evaluate expressions without
-/// being loaded as a plugin.
 pub struct EvalState {
     inner: NonNull<nixb_sys::EvalState>,
 }
 
+/// A borrowed evaluator state.
+///
+/// This is a view into an evaluator state owned by someone else: either the
+/// host Nix process when running as a plugin, or an owned [`EvalState`] in
+/// embedded programs.
+pub struct EvalStateRef<'a> {
+    inner: NonNull<nixb_sys::EvalState>,
+    _lifetime: PhantomData<&'a nixb_sys::EvalState>,
+}
+
 impl EvalState {
-    /// Creates a [`Context`] borrowing this state, scoped exactly like the
-    /// contexts provided to plugin callbacks.
-    ///
-    /// This is what unlocks the rest of this crate's API ([`eval`], attrsets,
-    /// functions, ...) for embedded programs.
-    ///
-    /// [`eval`]: Context::eval
+    /// Creates a [`Context`] borrowing this state.
     #[inline]
     pub fn context(&mut self) -> Context<'_> {
-        Context::new(CContext::create(), EvalStateRef::new(self.inner))
+        Context::new(CContext::create(), self.as_ref())
     }
 
-    /// Creates a new evaluator state by calling `nix_state_create`, the C
-    /// API's builder-less constructor.
+    /// Creates a new evaluator state.
     ///
     /// Settings are read from the ambient environment (environment variables
     /// and configuration files), except for the lookup path used by `<...>`
@@ -64,6 +63,23 @@ impl EvalState {
             .expect("nix_state_create returned null without setting an error");
 
         Ok(Self { inner })
+    }
+
+    #[inline]
+    pub(crate) fn as_ref(&self) -> EvalStateRef<'_> {
+        EvalStateRef::new(self.inner)
+    }
+}
+
+impl<'eval> EvalStateRef<'eval> {
+    #[inline]
+    pub(crate) fn as_ptr(&mut self) -> *mut nixb_sys::EvalState {
+        self.inner.as_ptr()
+    }
+
+    #[inline]
+    pub(crate) fn new(inner: NonNull<nixb_sys::EvalState>) -> Self {
+        Self { inner, _lifetime: PhantomData }
     }
 }
 

@@ -10,7 +10,8 @@ use nixb_c_context::CContext;
 use nixb_error::{Error, Result};
 
 use crate::IntoResult;
-use crate::context::{Context, EvalStateRef};
+use crate::context::Context;
+use crate::eval_state::EvalStateRef;
 use crate::value::{
     Borrowed,
     IntoValue,
