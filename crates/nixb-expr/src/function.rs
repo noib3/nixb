@@ -10,7 +10,8 @@ use nixb_c_context::CContext;
 use nixb_error::{Error, Result};
 
 use crate::IntoResult;
-use crate::context::{Context, EvalState};
+use crate::context::Context;
+use crate::eval_state::EvalStateRef;
 use crate::value::{
     Borrowed,
     IntoValue,
@@ -107,7 +108,7 @@ pub trait Function {
                 panic!("received NULL `Value` pointer in primop call");
             };
 
-            let mut ctx = Context::new(c_context, EvalState::new(state_ptr));
+            let mut ctx = Context::new(c_context, EvalStateRef::new(state_ptr));
 
             let args_list = ArgsList { args_ptr, _lifetime: PhantomData };
 

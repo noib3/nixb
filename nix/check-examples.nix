@@ -26,11 +26,19 @@ let
       name = "check-example-${exampleName}-${lib.getVersion nixPackage}";
       runtimeInputs = [ nixPackage ];
       text = ''
+        shopt -s nullglob
+
+        # Plugin examples are loaded into a Nix process.
         for plugin_file in ${examplePackage}/lib/*${sharedLibraryExt}; do
           ${lib.getExe nixPackage} eval \
             --option plugin-files "$plugin_file" \
             --expr null \
             >/dev/null
+        done
+
+        # Embedded examples are standalone executables.
+        for embedded_bin in ${examplePackage}/bin/*; do
+          "$embedded_bin"
         done
       '';
     };

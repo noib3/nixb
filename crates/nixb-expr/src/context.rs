@@ -1,7 +1,6 @@
 //! TODO: docs.
 
 use core::ffi::{CStr, c_uint};
-use core::marker::PhantomData;
 use core::ops::{Deref, DerefMut};
 use core::ptr::NonNull;
 
@@ -10,6 +9,7 @@ use nixb_error::Result;
 
 use crate::attrset::NixAttrset;
 use crate::builtins::Builtins;
+use crate::eval_state::EvalStateRef;
 use crate::value::{
     Borrowed,
     NixValue,
@@ -23,13 +23,7 @@ use crate::value::{
 /// TODO: docs.
 pub struct Context<'eval> {
     inner: CContext,
-    state: EvalState<'eval>,
-}
-
-/// TODO: docs.
-pub struct EvalState<'a> {
-    inner: NonNull<nixb_sys::EvalState>,
-    _lifetime: PhantomData<&'a nixb_sys::EvalState>,
+    state: EvalStateRef<'eval>,
 }
 
 pub(crate) struct AttrsetBuilder<'ctx, 'eval> {
@@ -188,7 +182,7 @@ impl<'eval> Context<'eval> {
     }
 
     #[inline]
-    pub(crate) fn new(inner: CContext, state: EvalState<'eval>) -> Self {
+    pub(crate) fn new(inner: CContext, state: EvalStateRef<'eval>) -> Self {
         Self { inner, state }
     }
 
@@ -208,21 +202,9 @@ impl<'eval> Context<'eval> {
     #[inline]
     pub(crate) fn with_raw_and_state<T>(
         &mut self,
-        fun: impl FnOnce(*mut nixb_sys::c_context, &mut EvalState<'eval>) -> T,
+        fun: impl FnOnce(*mut nixb_sys::c_context, &mut EvalStateRef<'eval>) -> T,
     ) -> Result<T> {
         self.inner.with_ptr(|raw_ctx| fun(raw_ctx, &mut self.state))
-    }
-}
-
-impl<'eval> EvalState<'eval> {
-    #[inline]
-    pub(crate) fn as_ptr(&mut self) -> *mut nixb_sys::EvalState {
-        self.inner.as_ptr()
-    }
-
-    #[inline]
-    pub(crate) fn new(inner: NonNull<nixb_sys::EvalState>) -> Self {
-        Self { inner, _lifetime: PhantomData }
     }
 }
 
@@ -320,7 +302,7 @@ impl<'eval> ListBuilder<'_, 'eval> {
 }
 
 impl<'eval> Deref for Context<'eval> {
-    type Target = EvalState<'eval>;
+    type Target = EvalStateRef<'eval>;
 
     #[inline]
     fn deref(&self) -> &Self::Target {

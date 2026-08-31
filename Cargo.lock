@@ -132,6 +132,7 @@ dependencies = [
  "nixb-cpp",
  "nixb-error",
  "nixb-macros",
+ "nixb-store",
  "nixb-sys",
  "pkg-config",
  "rustc_version",

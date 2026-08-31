@@ -8,10 +8,16 @@ license.workspace = true
 
 [features]
 default = ["nix-2-35"]
+embed = ["nixb/embed", "nixb/store"]
 nix-2-35 = ["nixb/nix-2-35"]
 
 [dependencies]
 nixb = { workspace = true, features = ["expr", "plugin"] }
+
+[[example]]
+name = "embedded"
+path = "embedded.rs"
+required-features = ["embed"]
 
 [[example]]
 name = "hello_world"
