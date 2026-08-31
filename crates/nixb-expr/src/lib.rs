@@ -18,6 +18,7 @@ mod init;
 mod into_result;
 pub mod list;
 mod never;
+pub mod primop;
 #[doc(hidden)]
 pub mod set_pattern;
 pub mod thunk;
@@ -31,5 +32,7 @@ pub use eval_state::EvalState;
 pub use init::{InitSentinel, init};
 pub use into_result::IntoResult;
 pub use never::Never;
-pub use nixb_macros::{Attrset, SetPattern, Value};
+pub use nixb_macros::{Attrset, PrimOp, SetPattern, Value};
+#[cfg(feature = "embed")]
+pub use primop::register_primop;
 pub use utf8_cstr::Utf8CStr;

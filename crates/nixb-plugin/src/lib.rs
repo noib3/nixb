@@ -6,9 +6,9 @@ extern crate alloc;
 
 mod entrypoint;
 mod plugin;
-pub mod primop;
 
 #[doc(hidden)]
 pub use entrypoint::entrypoint;
-pub use nixb_macros::{PrimOp, entry};
+pub use nixb_expr::{PrimOp, primop};
+pub use nixb_macros::entry;
 pub use plugin::Plugin;

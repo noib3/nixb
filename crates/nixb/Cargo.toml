@@ -24,7 +24,7 @@ nix-2-35 = [
   "nixb-plugin?/nix-2-35",
   "nixb-store?/nix-2-35",
 ]
-plugin = ["nixb-plugin"]
+plugin = ["expr", "nixb-plugin"]
 smallvec = ["nixb-expr?/smallvec"]
 std = ["nixb-expr?/std"]
 store = ["nixb-store"]
