@@ -10,10 +10,7 @@ default = ["nix-2-35"]
 
 compact_str = ["nixb-expr?/compact_str"]
 either = ["nixb-expr?/either"]
-embed = [
-  "nixb-expr?/embed",
-  "nixb-store?/embed",
-]
+embed = ["store", "nixb-expr?/embed", "nixb-store/embed"]
 expr = ["nixb-expr"]
 fetchers = ["nixb-fetchers"]
 flake = ["fetchers", "nixb-flake"]

@@ -8,11 +8,12 @@ license.workspace = true
 
 [features]
 default = ["nix-2-35"]
-embed = ["nixb/embed", "nixb/store"]
+embed = ["nixb/embed"]
 nix-2-35 = ["nixb/nix-2-35"]
+plugin = ["nixb/plugin"]
 
 [dependencies]
-nixb = { workspace = true, features = ["expr", "plugin"] }
+nixb = { workspace = true, features = ["expr"] }
 
 [[example]]
 name = "embedded"
@@ -23,11 +24,13 @@ required-features = ["embed"]
 name = "hello_world"
 path = "hello_world.rs"
 crate-type = ["cdylib"]
+required-features = ["plugin"]
 
 [[example]]
 name = "readme"
 path = "readme.rs"
 crate-type = ["cdylib"]
+required-features = ["plugin"]
 
 [lints.rust]
 refining-impl-trait.level = "allow"
