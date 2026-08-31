@@ -242,7 +242,7 @@ pub trait Callable {
         let init_res = ctx.with_raw_and_state(|ctx, state| unsafe {
             nixb_cpp::init_thunk(
                 ctx,
-                state.as_ptr(),
+                state,
                 dest.as_ptr(),
                 userdata_ptr,
                 on_force,

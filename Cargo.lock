@@ -88,6 +88,7 @@ dependencies = [
  "nixb-error",
  "nixb-expr",
  "nixb-fetchers",
+ "nixb-flake",
  "nixb-plugin",
  "nixb-store",
 ]
@@ -146,6 +147,18 @@ version = "0.1.0"
 dependencies = [
  "nixb-c-context",
  "nixb-error",
+ "nixb-sys",
+ "pkg-config",
+]
+
+[[package]]
+name = "nixb-flake"
+version = "0.1.0"
+dependencies = [
+ "nixb-c-context",
+ "nixb-error",
+ "nixb-expr",
+ "nixb-fetchers",
  "nixb-sys",
  "pkg-config",
 ]

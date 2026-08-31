@@ -1,0 +1,26 @@
+[package]
+name = "nixb-flake"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[features]
+nix-2-35 = [
+  "nixb-expr/nix-2-35",
+  "nixb-fetchers/nix-2-35",
+  "nixb-sys/nix-2-35",
+]
+
+[dependencies]
+nixb-c-context = { workspace = true }
+nixb-error = { workspace = true }
+nixb-expr = { workspace = true, features = ["embed"] }
+nixb-fetchers = { workspace = true }
+nixb-sys = { workspace = true }
+
+[build-dependencies]
+pkg-config = { workspace = true }
+
+[lints]
+workspace = true

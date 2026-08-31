@@ -9,7 +9,6 @@ use nixb_c_context::CContext;
 use nixb_error::{Error, Result};
 
 use crate::context::Context;
-use crate::eval_state::EvalStateRef;
 use crate::into_result::IntoResult;
 use crate::value::{
     IntoValue,
@@ -79,7 +78,7 @@ pub trait Thunk {
             Th::Output: IntoValue,
         {
             let c_context = CContext::new(ctx_raw);
-            let Some(state) = NonNull::new(state_raw) else {
+            let Some(mut state) = NonNull::new(state_raw) else {
                 panic!("received NULL `EvalState` pointer in thunk force");
             };
             let Some(dest) = NonNull::new(dest_raw) else {
@@ -89,7 +88,8 @@ pub trait Thunk {
             // uninitialized Value.
             let dest = unsafe { UninitValue::new(dest) };
 
-            let mut ctx = Context::new(c_context, EvalStateRef::new(state));
+            let state = unsafe { state.as_mut() };
+            let mut ctx = Context::new(c_context, state);
 
             // SAFETY:
             // - userdata is a `*mut Th` created by `Box::into_raw`;
@@ -124,7 +124,7 @@ pub trait Thunk {
         let init_res = ctx.with_raw_and_state(|ctx, state| unsafe {
             nixb_cpp::init_thunk(
                 ctx,
-                state.as_ptr(),
+                state,
                 dest.as_ptr(),
                 userdata,
                 on_force::<Self>,

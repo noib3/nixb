@@ -494,7 +494,7 @@ impl<Owner: ValueOwner> NixAttrset<Owner> {
         let value_raw = unsafe {
             nixb_cpp::get_attr_byname_lazy_no_incref(
                 self.inner.as_ptr(),
-                ctx.as_ptr(),
+                ctx.state_ptr(),
                 key.as_ptr(),
             )
         };
@@ -556,7 +556,7 @@ impl<Owner: ValueOwner> NixDerivation<Owner> {
             .into_inner();
 
         let realised_str = ctx.with_raw_and_state(|ctx, state| unsafe {
-            nixb_sys::string_realise(ctx, state.as_ptr(), value.as_ptr(), true)
+            nixb_sys::string_realise(ctx, state, value.as_ptr(), true)
         })?;
 
         unsafe {

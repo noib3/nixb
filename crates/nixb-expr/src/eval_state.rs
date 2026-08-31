@@ -1,53 +1,33 @@
-#[cfg(feature = "embed")]
+//! Evaluator state ownership and construction.
+
 use alloc::vec::Vec;
-#[cfg(feature = "embed")]
 use core::ffi::CStr;
-use core::marker::PhantomData;
-#[cfg(feature = "embed")]
 use core::ptr;
 use core::ptr::NonNull;
 
-#[cfg(feature = "embed")]
 use nixb_c_context::CContext;
-#[cfg(feature = "embed")]
 use nixb_error::Result;
-#[cfg(feature = "embed")]
 use nixb_store::Store;
 
-#[cfg(feature = "embed")]
 use crate::context::Context;
-#[cfg(feature = "embed")]
 use crate::init::InitSentinel;
 
 /// An evaluator state.
-#[cfg(feature = "embed")]
 pub struct EvalState {
     inner: NonNull<nixb_sys::EvalState>,
 }
 
 /// A builder for configuring and creating an [`EvalState`].
-#[cfg(feature = "embed")]
 pub struct EvalStateBuilder {
     ctx: CContext,
     inner: NonNull<nixb_sys::eval_state_builder>,
 }
 
-/// A borrowed evaluator state.
-///
-/// This is a view into an evaluator state owned by someone else: either the
-/// host Nix process when running as a plugin, or an owned `EvalState` in
-/// embedded programs.
-pub struct EvalStateRef<'a> {
-    inner: NonNull<nixb_sys::EvalState>,
-    _lifetime: PhantomData<&'a nixb_sys::EvalState>,
-}
-
-#[cfg(feature = "embed")]
 impl EvalState {
     /// Creates a [`Context`] borrowing this state.
     #[inline]
     pub fn context(&mut self) -> Context<'_> {
-        Context::new(CContext::create(), self.as_ref())
+        Context::new(CContext::create(), unsafe { self.inner.as_mut() })
     }
 
     /// Creates a new evaluator state.
@@ -82,14 +62,8 @@ impl EvalState {
 
         Ok(Self { inner })
     }
-
-    #[inline]
-    pub(crate) fn as_ref(&self) -> EvalStateRef<'_> {
-        EvalStateRef::new(self.inner)
-    }
 }
 
-#[cfg(feature = "embed")]
 impl EvalStateBuilder {
     /// Returns the underlying C builder pointer.
     ///
@@ -167,27 +141,13 @@ impl EvalStateBuilder {
     }
 }
 
-impl<'eval> EvalStateRef<'eval> {
-    #[inline]
-    pub(crate) fn as_ptr(&mut self) -> *mut nixb_sys::EvalState {
-        self.inner.as_ptr()
-    }
-
-    #[inline]
-    pub(crate) fn new(inner: NonNull<nixb_sys::EvalState>) -> Self {
-        Self { inner, _lifetime: PhantomData }
-    }
-}
-
-#[cfg(feature = "embed")]
 impl Drop for EvalState {
     #[inline]
     fn drop(&mut self) {
-        unsafe { nixb_sys::state_free(self.inner.as_ptr()) };
+        unsafe { nixb_sys::state_free(self.inner.as_ptr()) }
     }
 }
 
-#[cfg(feature = "embed")]
 impl Drop for EvalStateBuilder {
     #[inline]
     fn drop(&mut self) {

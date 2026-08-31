@@ -11,7 +11,6 @@ use nixb_error::{Error, Result};
 
 use crate::IntoResult;
 use crate::context::Context;
-use crate::eval_state::EvalStateRef;
 use crate::value::{
     Borrowed,
     IntoValue,
@@ -92,7 +91,7 @@ pub trait Function {
         ) {
             let c_context = CContext::new(ctx_raw);
 
-            let Some(state_ptr) = NonNull::new(state_raw) else {
+            let Some(mut state_ptr) = NonNull::new(state_raw) else {
                 panic!("received NULL `EvalState` pointer in primop call");
             };
 
@@ -108,7 +107,8 @@ pub trait Function {
                 panic!("received NULL `Value` pointer in primop call");
             };
 
-            let mut ctx = Context::new(c_context, EvalStateRef::new(state_ptr));
+            let state = unsafe { state_ptr.as_mut() };
+            let mut ctx = Context::new(c_context, state);
 
             let args_list = ArgsList { args_ptr, _lifetime: PhantomData };
 
@@ -243,7 +243,7 @@ pub trait Function {
         let init_res = ctx.with_raw_and_state(|ctx, state| unsafe {
             nixb_cpp::init_function(
                 ctx,
-                state.as_ptr(),
+                state,
                 dest.as_ptr(),
                 fun_name.as_ptr().cast(),
                 fun_name.len(),

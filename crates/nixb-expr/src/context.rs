@@ -1,7 +1,7 @@
 //! TODO: docs.
 
 use core::ffi::{CStr, c_uint};
-use core::ops::{Deref, DerefMut};
+use core::marker::PhantomData;
 use core::ptr::NonNull;
 
 use nixb_c_context::CContext;
@@ -9,9 +9,8 @@ use nixb_error::Result;
 
 use crate::attrset::NixAttrset;
 use crate::builtins::Builtins;
-use crate::eval_state::EvalStateRef;
 use crate::value::{
-    Borrowed,
+    self,
     NixValue,
     Owned,
     TryFromValue,
@@ -23,7 +22,8 @@ use crate::value::{
 /// TODO: docs.
 pub struct Context<'eval> {
     inner: CContext,
-    state: EvalStateRef<'eval>,
+    state: NonNull<nixb_sys::EvalState>,
+    _lifetime: PhantomData<&'eval mut nixb_sys::EvalState>,
 }
 
 pub(crate) struct AttrsetBuilder<'ctx, 'eval> {
@@ -51,7 +51,7 @@ impl<'eval> Context<'eval> {
         };
 
         // SAFETY: the value returned by `get_builtins` is initialized.
-        let owner = unsafe { Borrowed::new(builtins_ptr) };
+        let owner = unsafe { value::Borrowed::new(builtins_ptr) };
 
         match NixAttrset::try_from_value(NixValue::new(owner), self) {
             Ok(attrset) => Builtins::new(attrset),
@@ -70,7 +70,7 @@ impl<'eval> Context<'eval> {
         self.with_raw_and_state(|raw_ctx, state| unsafe {
             nixb_sys::expr_eval_from_string(
                 raw_ctx,
-                state.as_ptr(),
+                state,
                 expr.as_ptr(),
                 c".".as_ptr(),
                 dest.as_ptr(),
@@ -182,8 +182,11 @@ impl<'eval> Context<'eval> {
     }
 
     #[inline]
-    pub(crate) fn new(inner: CContext, state: EvalStateRef<'eval>) -> Self {
-        Self { inner, state }
+    pub(crate) fn new(
+        inner: CContext,
+        state: &'eval mut nixb_sys::EvalState,
+    ) -> Self {
+        Self { inner, state: NonNull::from(state), _lifetime: PhantomData }
     }
 
     #[inline]
@@ -199,12 +202,17 @@ impl<'eval> Context<'eval> {
         self.inner.with_ptr(fun)
     }
 
+    /// Calls a function with this context and evaluator's raw C pointers.
+    ///
+    /// Only meant to be used by functions in this crate and other `nixb-*`
+    /// crates that wrap C APIs taking both pointers.
+    #[doc(hidden)]
     #[inline]
-    pub(crate) fn with_raw_and_state<T>(
+    pub fn with_raw_and_state<T>(
         &mut self,
-        fun: impl FnOnce(*mut nixb_sys::c_context, &mut EvalStateRef<'eval>) -> T,
+        fun: impl FnOnce(*mut nixb_sys::c_context, *mut nixb_sys::EvalState) -> T,
     ) -> Result<T> {
-        self.inner.with_ptr(|raw_ctx| fun(raw_ctx, &mut self.state))
+        self.inner.with_ptr(|raw_ctx| fun(raw_ctx, self.state.as_ptr()))
     }
 }
 
@@ -298,22 +306,6 @@ impl<'eval> ListBuilder<'_, 'eval> {
         }
 
         self.index += 1;
-    }
-}
-
-impl<'eval> Deref for Context<'eval> {
-    type Target = EvalStateRef<'eval>;
-
-    #[inline]
-    fn deref(&self) -> &Self::Target {
-        &self.state
-    }
-}
-
-impl<'eval> DerefMut for Context<'eval> {
-    #[inline]
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.state
     }
 }
 

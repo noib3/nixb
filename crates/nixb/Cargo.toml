@@ -16,9 +16,11 @@ embed = [
 ]
 expr = ["nixb-expr"]
 fetchers = ["nixb-fetchers"]
+flake = ["fetchers", "nixb-flake"]
 nix-2-35 = [
   "nixb-expr?/nix-2-35",
   "nixb-fetchers?/nix-2-35",
+  "nixb-flake?/nix-2-35",
   "nixb-plugin?/nix-2-35",
   "nixb-store?/nix-2-35",
 ]
@@ -33,6 +35,7 @@ nixb-error = { workspace = true }
 
 nixb-expr = { workspace = true, optional = true }
 nixb-fetchers = { workspace = true, optional = true }
+nixb-flake = { workspace = true, optional = true }
 nixb-plugin = { workspace = true, optional = true }
 nixb-store = { workspace = true, optional = true }
 

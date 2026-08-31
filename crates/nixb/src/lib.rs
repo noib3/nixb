@@ -8,6 +8,9 @@ pub use nixb_expr as expr;
 #[cfg(feature = "fetchers")]
 #[doc(inline)]
 pub use nixb_fetchers as fetchers;
+#[cfg(feature = "flake")]
+#[doc(inline)]
+pub use nixb_flake as flake;
 #[cfg(feature = "plugin")]
 #[doc(inline)]
 pub use nixb_plugin as plugin;

@@ -217,8 +217,10 @@ impl<Owner: ValueOwner> NixValue<Owner> {
         self.owner.value_ptr().as_ptr()
     }
 
+    /// Creates a Nix value from its ownership handle.
+    #[doc(hidden)]
     #[inline]
-    pub(crate) fn new(owner: Owner) -> Self {
+    pub fn new(owner: Owner) -> Self {
         Self { owner }
     }
 
@@ -336,7 +338,7 @@ impl<Owner: ValueOwner> Value for NixValue<Owner> {
     #[inline]
     fn force_inline(&mut self, ctx: &mut Context) -> Result<()> {
         ctx.with_raw_and_state(|ctx, state| unsafe {
-            nixb_sys::value_force(ctx, state.as_ptr(), self.as_ptr());
+            nixb_sys::value_force(ctx, state, self.as_ptr());
         })
     }
 
@@ -796,7 +798,7 @@ impl Value for &std::path::Path {
         ctx.with_raw_and_state(|ctx, state| unsafe {
             nixb_sys::init_path_string(
                 ctx,
-                state.as_ptr(),
+                state,
                 dest.as_ptr(),
                 c_string.as_ptr(),
             );

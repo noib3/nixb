@@ -49,7 +49,7 @@ let
     let
       nixFeature = "nix-${builtins.replaceStrings [ "_" ] [ "-" ] nixSourceKey}";
       isPlugin = isPluginExample example;
-      features = [ nixFeature ] ++ lib.optionals (!isPlugin) [ "embed" ];
+      features = [ nixFeature ] ++ (example.required-features or [ ]);
     in
     rustPlatform.buildRustPackage {
       pname = "example-${example.name}-${nixFeature}";
