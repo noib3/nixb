@@ -24,9 +24,9 @@ pub mod tuple;
 mod utf8_cstr;
 pub mod value;
 
-#[cfg(feature = "embed")]
-pub use eval_state::EvalState;
 pub use eval_state::EvalStateRef;
+#[cfg(feature = "embed")]
+pub use eval_state::{EvalState, EvalStateBuilder};
 #[cfg(feature = "embed")]
 pub use init::{InitSentinel, init};
 pub use into_result::IntoResult;

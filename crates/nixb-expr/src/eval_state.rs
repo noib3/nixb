@@ -1,30 +1,48 @@
+#[cfg(feature = "embed")]
 use alloc::vec::Vec;
+#[cfg(feature = "embed")]
 use core::ffi::CStr;
 use core::marker::PhantomData;
-use core::ptr::{self, NonNull};
+#[cfg(feature = "embed")]
+use core::ptr;
+use core::ptr::NonNull;
 
+#[cfg(feature = "embed")]
 use nixb_c_context::CContext;
+#[cfg(feature = "embed")]
 use nixb_error::Result;
+#[cfg(feature = "embed")]
 use nixb_store::Store;
 
+#[cfg(feature = "embed")]
 use crate::context::Context;
+#[cfg(feature = "embed")]
 use crate::init::InitSentinel;
 
-/// An owned evaluator state.
+/// An evaluator state.
+#[cfg(feature = "embed")]
 pub struct EvalState {
     inner: NonNull<nixb_sys::EvalState>,
+}
+
+/// A builder for configuring and creating an [`EvalState`].
+#[cfg(feature = "embed")]
+pub struct EvalStateBuilder {
+    ctx: CContext,
+    inner: NonNull<nixb_sys::eval_state_builder>,
 }
 
 /// A borrowed evaluator state.
 ///
 /// This is a view into an evaluator state owned by someone else: either the
-/// host Nix process when running as a plugin, or an owned [`EvalState`] in
+/// host Nix process when running as a plugin, or an owned `EvalState` in
 /// embedded programs.
 pub struct EvalStateRef<'a> {
     inner: NonNull<nixb_sys::EvalState>,
     _lifetime: PhantomData<&'a nixb_sys::EvalState>,
 }
 
+#[cfg(feature = "embed")]
 impl EvalState {
     /// Creates a [`Context`] borrowing this state.
     #[inline]
@@ -71,6 +89,84 @@ impl EvalState {
     }
 }
 
+#[cfg(feature = "embed")]
+impl EvalStateBuilder {
+    /// Returns the underlying C builder pointer.
+    ///
+    /// Only meant to be used by other `nixb-*` crates whose C libraries take
+    /// a `nix_eval_state_builder *`.
+    #[doc(hidden)]
+    #[inline]
+    pub fn as_ptr(&mut self) -> *mut nixb_sys::eval_state_builder {
+        self.inner.as_ptr()
+    }
+
+    /// Creates an owned evaluator state, consuming the builder.
+    #[inline]
+    pub fn build(mut self) -> Result<EvalState> {
+        let state = self.ctx.with_ptr(|ctx| unsafe {
+            nixb_sys::eval_state_build(ctx, self.inner.as_ptr())
+        })?;
+
+        let inner = NonNull::new(state).expect(
+            "nix_eval_state_build returned null without setting an error",
+        );
+
+        Ok(EvalState { inner })
+    }
+
+    /// Reads settings from environment variables and configuration files.
+    #[inline]
+    pub fn load(&mut self) -> Result<&mut Self> {
+        self.ctx.with_ptr(|ctx| unsafe {
+            nixb_sys::eval_state_builder_load(ctx, self.inner.as_ptr())
+        })?;
+
+        Ok(self)
+    }
+
+    /// Creates a builder with default evaluator settings.
+    #[inline]
+    pub fn new(mut init: InitSentinel, store: &mut Store) -> Result<Self> {
+        let builder = init.ctx.with_ptr(|ctx| unsafe {
+            nixb_sys::eval_state_builder_new(ctx, store.as_ptr())
+        })?;
+
+        let inner = NonNull::new(builder).expect(
+            "nix_eval_state_builder_new returned null without setting an error",
+        );
+
+        Ok(Self { ctx: init.ctx, inner })
+    }
+
+    /// Sets the lookup path used by `<...>` expressions.
+    #[inline]
+    pub fn set_lookup_path<'a>(
+        &mut self,
+        entries: impl IntoIterator<Item = &'a CStr>,
+    ) -> Result<&mut Self> {
+        let mut entries =
+            entries.into_iter().map(|entry| entry.as_ptr()).collect::<Vec<_>>();
+
+        let entries_ptr = if entries.is_empty() {
+            ptr::null_mut()
+        } else {
+            entries.push(ptr::null());
+            entries.as_mut_ptr()
+        };
+
+        self.ctx.with_ptr(|ctx| unsafe {
+            nixb_sys::eval_state_builder_set_lookup_path(
+                ctx,
+                self.inner.as_ptr(),
+                entries_ptr,
+            )
+        })?;
+
+        Ok(self)
+    }
+}
+
 impl<'eval> EvalStateRef<'eval> {
     #[inline]
     pub(crate) fn as_ptr(&mut self) -> *mut nixb_sys::EvalState {
@@ -83,9 +179,18 @@ impl<'eval> EvalStateRef<'eval> {
     }
 }
 
+#[cfg(feature = "embed")]
 impl Drop for EvalState {
     #[inline]
     fn drop(&mut self) {
         unsafe { nixb_sys::state_free(self.inner.as_ptr()) };
+    }
+}
+
+#[cfg(feature = "embed")]
+impl Drop for EvalStateBuilder {
+    #[inline]
+    fn drop(&mut self) {
+        unsafe { nixb_sys::eval_state_builder_free(self.inner.as_ptr()) };
     }
 }
