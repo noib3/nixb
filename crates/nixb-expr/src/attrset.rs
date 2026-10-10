@@ -505,6 +505,49 @@ impl<Owner: ValueOwner> NixAttrset<Owner> {
     }
 }
 
+impl NixAttrset<Owned> {
+    /// Constructs an owned [`NixAttrset`] from key-value pairs of known length.
+    ///
+    /// The pairs need not be sorted, but the keys must be unique. If a key
+    /// appears more than once, the behavior of the resulting attribute set is
+    /// unspecified.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the iterator's length exceeds [`c_uint::MAX`] or if it yields
+    /// more entries than advertised.
+    #[inline]
+    pub fn from_iter<K: Key, V: IntoValue>(
+        pairs: impl IntoIterator<Item = (K, V), IntoIter: ExactSizeIterator>,
+        ctx: &mut Context,
+    ) -> Self {
+        let iter = pairs.into_iter();
+        let capacity = c_uint::try_from(iter.len()).unwrap_or_else(|_| {
+            panic!("iterator has too many elements, max is {}", c_uint::MAX)
+        });
+        let mut builder = ctx.make_attrset_builder(capacity);
+
+        for (index, (key, value)) in iter.enumerate() {
+            assert!(
+                index < capacity as usize,
+                "iterator yielded more entries than advertised",
+            );
+            let value = value.into_value(builder.as_mut());
+            key.with_cstr(|key| {
+                builder.insert(key, |dest, ctx| value.write(dest, ctx));
+            });
+        }
+
+        let dest = builder.as_mut().alloc_value();
+        builder.build(dest);
+
+        // SAFETY: the builder initialized `dest` as an attribute set, and
+        // this is the unique owning handle for the allocated value.
+        let owner = unsafe { Owned::new(dest.as_non_null()) };
+        Self { inner: NixValue::new(owner) }
+    }
+}
+
 impl<Owner: ValueOwner> NixDerivation<Owner> {
     /// TODO: docs.
     #[inline]
