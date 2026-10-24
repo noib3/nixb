@@ -247,7 +247,16 @@ impl Parse for Attrset {
                 input.parse::<Token![:]>()?;
                 input.parse()?
             } else if let Some(ident) = key_ident {
-                // Shorthand syntax: use key ident as value.
+                // Shorthand syntax: use key ident as value. That's only
+                // possible if the key is a single Rust identifier.
+                if let Key::Literal(key, span) = &key
+                    && key.as_bytes() != ident.to_string().as_bytes()
+                {
+                    return Err(syn::Error::new(
+                        *span,
+                        "attribute set keys containing `-` need a value",
+                    ));
+                }
                 Value::Expr(parse_quote! { #ident })
             } else {
                 return Err(syn::Error::new(
@@ -305,7 +314,21 @@ impl Parse for Key {
         // c-string literal.
         else {
             let ident = input.call(syn::Ident::parse_any)?;
-            let ident_str = ident.to_string();
+            let mut ident_str = ident.to_string();
+            // Nix identifiers can contain `-`, which Rust tokenizes as
+            // punctuation separate from the segments around it, so glue them
+            // back together.
+            while input.peek(Token![-]) {
+                input.parse::<Token![-]>()?;
+                ident_str.push('-');
+                if input.peek(syn::Ident::peek_any) {
+                    let segment = input.call(syn::Ident::parse_any)?;
+                    ident_str.push_str(&segment.to_string());
+                } else if input.peek(syn::LitInt) {
+                    let segment = input.parse::<syn::LitInt>()?;
+                    ident_str.push_str(&segment.to_string());
+                }
+            }
             let c_string = CString::new(ident_str).map_err(|_| {
                 syn::Error::new(
                     ident.span(),
@@ -399,6 +422,48 @@ mod tests {
             error
                 .to_string()
                 .contains("expected `,` between attribute set fields")
+        );
+    }
+
+    #[test]
+    fn joins_hyphenated_keys() {
+        let expanded = expand(quote! {
+            target-directory: "foo",
+            build-type: "bar",
+            x86-64: "baz",
+            trailing-: "qux",
+        })
+        .unwrap()
+        .to_string();
+
+        for key in ["target-directory", "build-type", "x86-64", "trailing-"] {
+            assert!(expanded.contains(&format!("c\"{key}\"")), "{expanded}");
+        }
+    }
+
+    #[test]
+    fn rejects_duplicate_hyphenated_keys() {
+        let error = expand(quote! {
+            target-directory: "foo",
+            target-directory: "bar",
+        })
+        .unwrap_err();
+
+        assert!(
+            error
+                .to_string()
+                .contains("duplicate attrset key `target-directory`")
+        );
+    }
+
+    #[test]
+    fn rejects_shorthand_hyphenated_keys() {
+        let error = expand(quote! { target-directory }).unwrap_err();
+
+        assert!(
+            error
+                .to_string()
+                .contains("attribute set keys containing `-` need a value")
         );
     }
 
